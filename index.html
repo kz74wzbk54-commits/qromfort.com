@@ -107,6 +107,8 @@ button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-
 .opt.is-ack .status{color:var(--go);font-weight:700}
 .opt .body{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
 .cancel{background:none;border:0;padding:.25rem 0;min-height:40px;color:var(--ink);text-decoration:underline;text-underline-offset:.2em;font-size:.9375rem;align-self:flex-start;text-align:left;font-weight:700}
+.fail{margin:0 0 1rem;padding:.625rem .75rem;border:2px solid var(--alert);background:var(--alert-bg);border-radius:.5rem;font-weight:700}
+.opt.is-busy{opacity:.65}
 .fine{margin:1.5rem 0 0;font-size:.875rem;color:var(--ink-soft)}
 .patient :focus-visible{outline:3px solid var(--focus);outline-offset:3px}
 .patient [tabindex="-1"]:focus{outline:3px solid var(--focus);outline-offset:3px}
@@ -150,6 +152,13 @@ button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-
 .legend .fill{background:var(--c)}
 .board :focus-visible{outline:3px solid #fff;outline-offset:2px}
 
+.gate{max-width:22rem;margin:3rem auto}
+.gate label{display:block;font-weight:700;margin-bottom:.5rem}
+.gate input{width:100%;font:inherit;font-size:1.5rem;letter-spacing:.2em;padding:.6rem .75rem;background:#000;color:var(--m-text);border:2px solid #4A4A52;border-radius:.5rem}
+.gate button{margin-top:.75rem;width:100%;min-height:48px;border:0;border-radius:.5rem;background:var(--m-text);color:#000;font-weight:700}
+.gate p{color:var(--m-over);min-height:1.5em;margin:.75rem 0 0}
+.setup{max-width:34rem;margin:2rem auto;border:2px solid var(--m-wait);border-radius:.5rem;padding:1rem}
+.offline{background:var(--m-over);color:#000;font-weight:700;padding:.6rem .8rem;border-radius:.375rem;margin:0 0 .75rem}
 .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--m-panel);color:var(--m-text);border-top:3px solid var(--c,var(--m-line));padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));max-height:70vh;overflow:auto}
 .sheet-in{max-width:40rem;margin:0 auto}
 .sheet-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.5rem}
@@ -193,6 +202,17 @@ button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-
     </h1>
     <p class="b-sum" id="b-sum"></p>
   </div>
+  <div class="gate" id="gate" hidden>
+    <form id="pin-form">
+      <label for="pin">Staff PIN</label>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" required>
+      <button type="submit">Open the board</button>
+      <p id="pin-msg" role="alert"></p>
+    </form>
+  </div>
+  <p class="setup" id="setup" hidden></p>
+  <p class="offline" id="offline" role="alert" hidden>Not connected. Requests may be missing. Retrying.</p>
+  <div id="board-body">
   <div id="areas"></div>
   <ul class="legend" aria-label="What the colors mean">
     <li style="--c:var(--m-new)"><i></i>New, under 5 min</li>
@@ -200,6 +220,7 @@ button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-
     <li style="--c:var(--m-over)"><i class="fill"></i>! Over 10 min</li>
     <li style="--c:var(--m-ack)"><i></i>✓ Someone is on the way</li>
   </ul>
+  </div>
   <div class="sheet" id="sheet" hidden>
     <div class="sheet-in">
       <div class="sheet-top">
@@ -216,7 +237,7 @@ button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-
 'use strict';
 
 /* =====================================================================
-   CONFIG — edit these for the real unit
+   CONFIG — edit these for the real unit (and keep api/requests.js in step)
    ===================================================================== */
 // Every place a QR code can live. `id` is what goes in the QR link (?room=ID).
 var AREAS = [
@@ -248,6 +269,8 @@ AREAS.forEach(function(a){
 
 var WAIT_AFTER = 5 * 60 * 1000;       // cyan -> yellow
 var OVER_AFTER = 10 * 60 * 1000;      // yellow -> red
+var POLL_BOARD = 10 * 1000;           // how often the board checks for requests
+var POLL_PATIENT = 15 * 1000;         // how often a phone checks on its own request
 
 // `floor` is the lowest alarm level a request can start at (0 new, 1 waiting).
 var REQUESTS = [
@@ -263,28 +286,39 @@ var REQ = {};
 REQUESTS.forEach(function(r){ REQ[r.id] = r; });
 
 /* =====================================================================
-   STORE — the only part that changes when the backend exists.
-   Today: this browser only (localStorage, synced across tabs).
-   Later: swap the bodies for fetch()/realtime calls; keep the same API.
+   MODE — the QR code decides the room.
+   Real use:  /?room=12  /?room=42A  /?room=C3  /?room=T1  (patient)   /?view=board  (staff)
+   Prototype: /?demo  (this device only, nothing is sent)
    ===================================================================== */
-var store = (function(){
+var params = new URLSearchParams(location.search);
+var qRoom = params.get('room');
+var qView = params.get('view');
+var onSite = /(^|\.)qromfort\.com$/i.test(location.hostname);
+var demo = params.has('demo') || (!qRoom && qView !== 'board' && !onSite);
+var view = qView === 'board' ? 'board' : 'patient';
+var room = ROOMS.indexOf(qRoom) > -1 ? qRoom : (demo ? '12' : null);
+
+function readJSON(key, fallback){
+  try { var v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? v : fallback; }
+  catch (e) { return fallback; }
+}
+function writeJSON(key, value){ try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+function valid(r){ return r && REQ[r.type] && SPOT[r.room]; }
+
+/* =====================================================================
+   STORES — same shape, two homes.
+   localStore:  prototype only, this browser.
+   remoteStore: the real thing, talks to /api/requests.
+   ===================================================================== */
+function localStore(){
   var KEY = 'qromfort.requests.v1';
-  var mem = [];
-  var subs = [];
+  var mem = [], subs = [];
   function load(){
-    try {
-      var raw = localStorage.getItem(KEY);
-      var v = raw ? JSON.parse(raw) : [];
-      mem = Array.isArray(v) ? v : [];
-    } catch (e) { /* storage unavailable: stay in memory */ }
-    var cutoff = Date.now() - 6 * 60 * 60 * 1000;   // drop anything stale
-    mem = mem.filter(function(r){ return r && r.createdAt > cutoff && REQ[r.type] && SPOT[r.room]; });
+    var v = readJSON(KEY, []);
+    var cutoff = Date.now() - 6 * 60 * 60 * 1000;
+    mem = (Array.isArray(v) ? v : []).filter(function(r){ return valid(r) && r.createdAt > cutoff; });
   }
-  function save(next){
-    mem = next;
-    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) {}
-    notify();
-  }
+  function save(next){ mem = next; writeJSON(KEY, mem); notify(); }
   function notify(){ subs.forEach(function(fn){ fn(); }); }
   try {
     window.addEventListener('storage', function(e){
@@ -292,24 +326,148 @@ var store = (function(){
     });
   } catch (e) {}
   load();
-  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function put(room, type, createdAt, ackAt){
+    var found = mem.filter(function(r){ return r.room === room && r.type === type; })[0];
+    if (found) return found;
+    var rec = { id:room + ':' + type, room:room, type:type, createdAt:createdAt || Date.now(), ackAt:ackAt || null };
+    save(mem.concat([rec]));
+    return rec;
+  }
   return {
+    state:'ok', setupError:null,
+    now: function(){ return Date.now(); },
     list: function(){ return mem.slice(); },
-    add: function(room, type, createdAt, ackAt){
-      var dup = mem.some(function(r){ return r.room === room && r.type === type; });
-      if (dup) return null;
-      var rec = { id:uid(), room:room, type:type, createdAt:createdAt || Date.now(), ackAt:ackAt || null };
-      save(mem.concat([rec]));
-      return rec;
-    },
+    start: function(){ return Promise.resolve(); },
+    canCancel: function(){ return true; },
+    seed: put,
+    add: function(room, type){ return Promise.resolve(put(room, type)); },
     ack: function(id){
       save(mem.map(function(r){ return r.id === id ? Object.assign({}, r, { ackAt: Date.now() }) : r; }));
+      return Promise.resolve();
     },
-    close: function(id){ save(mem.filter(function(r){ return r.id !== id; })); },
+    close: function(id){ save(mem.filter(function(r){ return r.id !== id; })); return Promise.resolve(); },
     clear: function(){ save([]); },
+    unlock: function(){ return Promise.resolve('ok'); },
     subscribe: function(fn){ subs.push(fn); }
   };
-})();
+}
+
+function remoteStore(){
+  var mem = [], subs = [], skew = 0, timer = null, scope = null;
+  var tokens = readJSON('qromfort.tokens', {});     // lets this phone cancel what it asked for
+  var session = null;
+  try { session = localStorage.getItem('qromfort.session'); } catch (e) {}
+  var api = { state:'loading', setupError:null };
+
+  function notify(){ subs.forEach(function(fn){ fn(); }); }
+  function isBoard(){ return scope && !scope.room; }
+  function call(method, query, body){
+    var headers = {};
+    if (body) headers['Content-Type'] = 'application/json';
+    if (session) headers['X-Board-Session'] = session;
+    return fetch('/api/requests' + (query || ''), {
+      method:method, headers:headers, body: body ? JSON.stringify(body) : undefined, cache:'no-store'
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(d){ return { status:r.status, data:d || {} }; });
+    });
+  }
+  function take(data){
+    if (typeof data.now === 'number') skew = data.now - Date.now();
+    if (Array.isArray(data.requests)) mem = data.requests.filter(valid);
+  }
+  function lock(){
+    session = null;
+    try { localStorage.removeItem('qromfort.session'); } catch (e) {}
+    api.state = 'locked';
+  }
+  function settle(res){
+    if (res.status === 200) { take(res.data); api.state = 'ok'; return true; }
+    if (res.status === 401) lock();
+    else if (res.status === 503 && res.data.error) { api.state = 'setup'; api.setupError = res.data.error; }
+    else api.state = 'offline';
+    return false;
+  }
+  function refresh(){
+    if (!scope) return Promise.resolve();
+    var q = scope.room ? '?room=' + encodeURIComponent(scope.room) : '';
+    return call('GET', q).then(function(res){
+      if (settle(res) && scope.room) {
+        // forget cancel tokens for requests that are gone
+        var live = {}, changed = false;
+        mem.forEach(function(r){ live[r.id] = true; });
+        Object.keys(tokens).forEach(function(id){
+          if (id.indexOf(scope.room + ':') === 0 && !live[id]) { delete tokens[id]; changed = true; }
+        });
+        if (changed) writeJSON('qromfort.tokens', tokens);
+      }
+    }, function(){ api.state = 'offline'; }).then(function(){ notify(); schedule(); });
+  }
+  function schedule(){
+    clearTimeout(timer);
+    if (!scope || document.hidden || api.state === 'locked') return;
+    if (scope.room && api.state === 'ok' && !mem.length) return;      // nothing to watch
+    var wait = scope.room ? POLL_PATIENT : POLL_BOARD;
+    if (api.state === 'setup') wait = 30 * 1000;
+    timer = setTimeout(refresh, wait);
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && scope && api.state !== 'locked') refresh();
+    else clearTimeout(timer);
+  });
+
+  api.now = function(){ return Date.now() + skew; };
+  api.list = function(){ return mem.slice(); };
+  api.subscribe = function(fn){ subs.push(fn); };
+  api.canCancel = function(r){ return isBoard() || !!tokens[r.id]; };
+  api.start = function(sc){
+    scope = sc;
+    if (isBoard() && !session) { api.state = 'locked'; notify(); return Promise.resolve(); }
+    return refresh();
+  };
+  api.add = function(room, type){
+    return call('POST', '', { room:room, type:type }).then(function(res){
+      if (res.status !== 200 || !res.data.request) throw new Error(res.data.error || 'not_sent');
+      var rec = res.data.request;
+      if (typeof res.data.now === 'number') skew = res.data.now - Date.now();
+      if (res.data.token) { tokens[rec.id] = res.data.token; writeJSON('qromfort.tokens', tokens); }
+      mem = mem.filter(function(r){ return r.id !== rec.id; }).concat([rec]);
+      api.state = 'ok';
+      notify(); schedule();
+      return rec;
+    });
+  };
+  api.close = function(id){
+    var body = isBoard() ? { action:'done', id:id } : { action:'cancel', id:id, token:tokens[id] };
+    return call('POST', '', body).then(function(res){
+      if (res.status === 200) {
+        if (tokens[id]) { delete tokens[id]; writeJSON('qromfort.tokens', tokens); }
+        if (Array.isArray(res.data.requests)) take(res.data);
+        else mem = mem.filter(function(r){ return r.id !== id; });
+        api.state = 'ok';
+      } else settle(res);
+    }, function(){ api.state = 'offline'; }).then(function(){ notify(); schedule(); });
+  };
+  api.ack = function(id){
+    return call('POST', '', { action:'ack', id:id }).then(settle, function(){ api.state = 'offline'; })
+      .then(function(){ notify(); schedule(); });
+  };
+  api.unlock = function(pin){
+    return call('POST', '', { action:'unlock', pin:pin }).then(function(res){
+      if (res.status === 200 && res.data.session) {
+        session = res.data.session;
+        try { localStorage.setItem('qromfort.session', session); } catch (e) {}
+        return refresh().then(function(){ return 'ok'; });
+      }
+      if (res.status === 503 && res.data.error) { api.state = 'setup'; api.setupError = res.data.error; notify(); schedule(); return 'setup'; }
+      if (res.status === 429) return 'too_many';
+      if (res.status === 401) return 'wrong';
+      return 'offline';
+    }, function(){ return 'offline'; });
+  };
+  return api;
+}
+
+var store = demo ? localStore() : remoteStore();
 
 /* =====================================================================
    COPY — patient-facing, four languages
@@ -327,7 +485,8 @@ var T = {
     open:'Asked at {t}. Waiting for someone to pick it up.', ack:'Someone is on the way.',
     cancel:'Cancel this request', waterNote:'Your nurse will check that it’s safe for you to drink first.',
     fine:'Only where you are and your request are sent. No name, no health details.',
-    scan:'Scan the code next to you to start.', sentLive:'Request sent.', ackLive:'Someone is on the way.'
+    scan:'Scan the code next to you to start.', sentLive:'Request sent.', ackLive:'Someone is on the way.',
+    sending:'Sending…', fail:'That didn’t send. Try again, or tell a staff member.'
   },
   es:{
     kind:{bed:'Habitación',chair:'Silla',triage:'Triaje'}, q:'¿Qué necesita para estar más a gusto?',
@@ -339,7 +498,8 @@ var T = {
     open:'Pedido a las {t}. Esperando a que alguien lo atienda.', ack:'Alguien viene en camino.',
     cancel:'Cancelar este pedido', waterNote:'Su enfermera o enfermero confirmará primero que puede beber.',
     fine:'Solo se envían su ubicación y lo que pidió. Sin nombre ni datos de salud.',
-    scan:'Escanee el código que tiene al lado para empezar.', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.'
+    scan:'Escanee el código que tiene al lado para empezar.', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.',
+    sending:'Enviando…', fail:'No se pudo enviar. Inténtelo de nuevo o avise a un miembro del personal.'
   },
   ht:{
     kind:{bed:'Chanm',chair:'Chèz',triage:'Triyaj'}, q:'Kisa ki ta fè w santi w pi alèz?',
@@ -351,7 +511,8 @@ var T = {
     open:'Ou mande sa a {t}. N ap tann yon moun reponn.', ack:'Yon moun ap vini.',
     cancel:'Anile demann sa a', waterNote:'Enfimyè ou a ap verifye anvan si ou ka bwè.',
     fine:'Se sèlman kote ou ye a ak sa ou mande a ki voye. Pa gen non, pa gen enfòmasyon sante.',
-    scan:'Eskane kòd ki bò kote w la pou kòmanse.', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.'
+    scan:'Eskane kòd ki bò kote w la pou kòmanse.', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.',
+    sending:'N ap voye…', fail:'Sa pa voye. Eseye ankò, oswa di yon anplwaye sa.'
   },
   pt:{
     kind:{bed:'Quarto',chair:'Cadeira',triage:'Triagem'}, q:'O que deixaria você mais confortável?',
@@ -363,7 +524,8 @@ var T = {
     open:'Pedido às {t}. Aguardando alguém atender.', ack:'Alguém está a caminho.',
     cancel:'Cancelar este pedido', waterNote:'A enfermagem vai confirmar antes se você pode beber.',
     fine:'Só o lugar onde você está e o seu pedido são enviados. Sem nome, sem dados de saúde.',
-    scan:'Escaneie o código ao seu lado para começar.', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.'
+    scan:'Escaneie o código ao seu lado para começar.', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.',
+    sending:'Enviando…', fail:'Não foi enviado. Tente de novo ou avise alguém da equipe.'
   }
 };
 
@@ -380,18 +542,6 @@ var ICON = {
   other:   svg('<path d="M4 5h16v11H10l-4 4v-4H4z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/>'),
   mark: '<svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="3" y="3" width="19" height="19" rx="5" stroke="currentColor" stroke-width="3"/><rect x="9.5" y="9.5" width="6" height="6" rx="1" fill="currentColor"/><path d="M19 19l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
 };
-
-/* =====================================================================
-   MODE — the QR code decides the room.
-   Real use:  /?room=12  /?room=42A  /?room=C3  /?room=T1  (patient)   /?view=board  (staff)
-   No params: prototype mode with the switcher bar.
-   ===================================================================== */
-var params = new URLSearchParams(location.search);
-var qRoom = params.get('room');
-var qView = params.get('view');
-var demo = !qRoom && qView !== 'board';
-var view = qView === 'board' ? 'board' : 'patient';
-var room = ROOMS.indexOf(qRoom) > -1 ? qRoom : (demo ? '12' : null);
 
 var lang = 'en';
 try {
@@ -418,6 +568,17 @@ function elapsed(ms){
 /* =====================================================================
    PATIENT PAGE
    ===================================================================== */
+var pending = {};        // request types this phone is sending right now
+var sendFailed = false;
+var lastPatientHtml = null;
+
+function focusKeyNow(){
+  var a = document.activeElement;
+  if (!a || !elPatient.contains(a)) return null;
+  var card = a.closest('[data-card]');
+  return a.dataset.ask || (card && card.dataset.card) || (a.dataset.lang ? 'lang:' + a.dataset.lang : null);
+}
+
 function renderPatient(focusType){
   var t = T[lang];
   document.documentElement.lang = lang;
@@ -432,52 +593,62 @@ function renderPatient(focusType){
       '</div>' +
     '</div>';
 
+  var html;
   if (!room) {
-    elPatient.innerHTML = head + '<h1 style="margin-top:2rem">' + t.scan + '</h1>';
-    return;
+    html = head + '<h1 style="margin-top:2rem">' + t.scan + '</h1>';
+  } else {
+    var spot = SPOT[room];
+    var mine = {};
+    store.list().forEach(function(r){ if (r.room === room) mine[r.type] = r; });
+    var any = Object.keys(mine).length > 0;
+
+    var offered = REQUESTS.filter(function(d){ return !d.notFor || d.notFor.indexOf(spot.kind) < 0; });
+    var asked = REQUESTS.filter(function(d){ return mine[d.id]; })
+      .sort(function(a,b){ return mine[a.id].createdAt - mine[b.id].createdAt; });
+    var open = offered.filter(function(d){ return !mine[d.id]; });
+    var small = open.filter(function(d){ return d.id !== 'blanket'; });
+
+    var askedHtml = asked.map(function(def){
+      var r = mine[def.id];
+      var acked = !!r.ackAt;
+      return '<div class="opt asked' + (acked ? ' is-ack' : ' is-open') + '" data-card="' + def.id + '" tabindex="-1">' +
+        ICON[def.id] +
+        '<div class="body">' +
+          '<span>' + t[def.id] + '</span>' +
+          '<span class="status">' + (acked ? t.ack : t.open.replace('{t}', clock(r.createdAt))) + '</span>' +
+          (def.id === 'water' ? '<span class="note">' + t.waterNote + '</span>' : '') +
+          (store.canCancel(r) ? '<button type="button" class="cancel" data-cancel="' + r.id + '">' + t.cancel + '</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    var openHtml = open.map(function(def){
+      var lastOdd = small.length % 2 === 1 && def === small[small.length - 1];
+      var shape = def.id === 'blanket' ? ' opt--hero' : (lastOdd ? ' opt--wide' : '');
+      var busy = !!pending[def.id];
+      return '<button type="button" class="opt' + shape + (busy ? ' is-busy' : '') + '" data-ask="' + def.id + '"' + (busy ? ' aria-disabled="true"' : '') + '>' +
+        ICON[def.id] + '<span>' + (busy ? t.sending : t[def.id]) + '</span></button>';
+    }).join('');
+
+    html = head +
+      '<p class="room">' + t.kind[spot.kind] + ' ' + spot.num + '</p>' +
+      '<h1>' + t.q + '</h1>' +
+      '<p class="emergency"><strong>' + t.emLead + '</strong> ' + (spot.kind === 'bed' ? t.em : t.emNoBell) + '</p>' +
+      (sendFailed ? '<p class="fail" role="alert">' + t.fail + '</p>' : '') +
+      (any ? '<div class="seen"><h2>' + t.seen + '</h2><p>' + t.first + '</p></div><div class="asked-list">' + askedHtml + '</div>' : '') +
+      (open.length ? '<div class="options">' + openHtml + '</div>' : '') +
+      '<p class="fine">' + t.fine + '</p>';
   }
 
-  var mine = {};
-  store.list().forEach(function(r){ if (r.room === room) mine[r.type] = r; });
-  var any = Object.keys(mine).length > 0;
+  if (html === lastPatientHtml && !focusType) return;      // nothing changed: leave the page (and focus) alone
+  var key = focusType || focusKeyNow();
+  elPatient.innerHTML = html;
+  lastPatientHtml = html;
 
-  var spot = SPOT[room];
-  var offered = REQUESTS.filter(function(d){ return !d.notFor || d.notFor.indexOf(spot.kind) < 0; });
-  var asked = REQUESTS.filter(function(d){ return mine[d.id]; })
-    .sort(function(a,b){ return mine[a.id].createdAt - mine[b.id].createdAt; });
-  var open = offered.filter(function(d){ return !mine[d.id]; });
-  var small = open.filter(function(d){ return d.id !== 'blanket'; });
-
-  var askedHtml = asked.map(function(def){
-    var r = mine[def.id];
-    var acked = !!r.ackAt;
-    return '<div class="opt asked' + (acked ? ' is-ack' : ' is-open') + '" data-card="' + def.id + '" tabindex="-1">' +
-      ICON[def.id] +
-      '<div class="body">' +
-        '<span>' + t[def.id] + '</span>' +
-        '<span class="status">' + (acked ? t.ack : t.open.replace('{t}', clock(r.createdAt))) + '</span>' +
-        (def.id === 'water' ? '<span class="note">' + t.waterNote + '</span>' : '') +
-        '<button type="button" class="cancel" data-cancel="' + r.id + '">' + t.cancel + '</button>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-
-  var openHtml = open.map(function(def){
-    var lastOdd = small.length % 2 === 1 && def === small[small.length - 1];
-    var shape = def.id === 'blanket' ? ' opt--hero' : (lastOdd ? ' opt--wide' : '');
-    return '<button type="button" class="opt' + shape + '" data-ask="' + def.id + '">' + ICON[def.id] + '<span>' + t[def.id] + '</span></button>';
-  }).join('');
-
-  elPatient.innerHTML = head +
-    '<p class="room">' + t.kind[spot.kind] + ' ' + spot.num + '</p>' +
-    '<h1>' + t.q + '</h1>' +
-    '<p class="emergency"><strong>' + t.emLead + '</strong> ' + (spot.kind === 'bed' ? t.em : t.emNoBell) + '</p>' +
-    (any ? '<div class="seen"><h2>' + t.seen + '</h2><p>' + t.first + '</p></div><div class="asked-list">' + askedHtml + '</div>' : '') +
-    (open.length ? '<div class="options">' + openHtml + '</div>' : '') +
-    '<p class="fine">' + t.fine + '</p>';
-
-  if (focusType) {
-    var el = elPatient.querySelector('[data-card="' + focusType + '"]') || elPatient.querySelector('[data-ask="' + focusType + '"]');
+  if (key) {
+    var el = key.indexOf('lang:') === 0
+      ? elPatient.querySelector('[data-lang="' + key.slice(5) + '"]')
+      : (elPatient.querySelector('[data-card="' + key + '"]') || elPatient.querySelector('[data-ask="' + key + '"]'));
     if (el) el.focus();
   }
 }
@@ -488,19 +659,26 @@ elPatient.addEventListener('click', function(e){
   if (b.dataset.lang) {
     lang = b.dataset.lang;
     try { localStorage.setItem('qromfort.lang', lang); } catch (err) {}
-    renderPatient();
-    var again = elPatient.querySelector('[data-lang="' + lang + '"]');
-    if (again) again.focus();
+    renderPatient('lang:' + lang);
   } else if (b.dataset.ask) {
     var type = b.dataset.ask;
-    store.add(room, type);
+    if (pending[type]) return;
+    pending[type] = true;
+    sendFailed = false;
     renderPatient(type);
-    elLive.textContent = T[lang].sentLive + ' ' + T[lang][type];
+    store.add(room, type).then(function(){
+      delete pending[type];
+      renderPatient(type);
+      elLive.textContent = T[lang].sentLive + ' ' + T[lang][type];
+    }, function(){
+      delete pending[type];
+      sendFailed = true;                 // never pretend it went through
+      renderPatient(type);
+    });
   } else if (b.dataset.cancel) {
     var card = b.closest('[data-card]');
     var typeBack = card ? card.dataset.card : null;
-    store.close(b.dataset.cancel);
-    renderPatient(typeBack);
+    store.close(b.dataset.cancel).then(function(){ renderPatient(typeBack); });
   }
 });
 
@@ -516,9 +694,14 @@ function rankOf(r, now){
 }
 var STATE_WORD = { ack:'on the way', 'new':'new', wait:'waiting', over:'over 10 minutes' };
 var GLYPH = { ack:'✓ ', 'new':'', wait:'', over:'! ' };
+var SETUP_HELP = {
+  no_database:'The database isn’t connected yet. In Vercel, open this project’s Storage tab, create an Upstash for Redis database, connect it to this project, then redeploy.',
+  no_pin:'No staff PIN is set yet. In Vercel, open Settings, then Environment Variables, add BOARD_PIN, then redeploy.'
+};
 
 var tiles = {};
 var openRoom = null;
+var sheetSig = null;
 
 function buildBoard(){
   var wrap = $('areas');
@@ -560,8 +743,19 @@ function summarize(now){
   return out;
 }
 
+function renderBoardState(){
+  var st = store.state;
+  var locked = st === 'locked', setup = st === 'setup';
+  $('gate').hidden = !locked;
+  $('setup').hidden = !setup;
+  $('offline').hidden = st !== 'offline';
+  $('board-body').hidden = locked || setup;
+  if (setup) $('setup').textContent = SETUP_HELP[store.setupError] || 'The server isn’t set up yet.';
+  if (locked || setup) closeSheet(true);
+}
+
 function tickBoard(){
-  var now = Date.now();
+  var now = store.now();
   var rooms = summarize(now);
   var waiting = 0, onWay = 0, longest = null;
 
@@ -595,7 +789,9 @@ function tickBoard(){
   });
 
   var sum = $('b-sum');
-  if (!waiting && !onWay) sum.textContent = 'All rooms quiet.';
+  if (store.state === 'loading') sum.textContent = 'Connecting…';
+  else if (store.state === 'locked' || store.state === 'setup') sum.textContent = '';
+  else if (!waiting && !onWay) sum.textContent = 'All rooms quiet.';
   else {
     var parts = [];
     if (waiting) parts.push(waiting + ' waiting');
@@ -617,9 +813,12 @@ function tickBoard(){
 
 function renderSheet(){
   if (!openRoom) return;
-  var now = Date.now();
+  var now = store.now();
   var info = summarize(now)[openRoom];
   if (!info) { closeSheet(true); return; }
+  var sig = openRoom + '|' + info.list.map(function(r){ return r.id + (r.ackAt ? ':a' : ':o'); }).join('|');
+  if (sig === sheetSig) return;                       // unchanged: keep focus where it is
+  sheetSig = sig;
   $('sheet-title').textContent = SPOT[openRoom].staff;
   $('sheet-rows').innerHTML = info.list.map(function(r){
     var acked = !!r.ackAt;
@@ -635,6 +834,7 @@ function renderSheet(){
 
 function openSheet(rm){
   openRoom = rm;
+  sheetSig = null;
   $('sheet').hidden = false;
   renderSheet();
   tickBoard();
@@ -643,6 +843,7 @@ function openSheet(rm){
 function closeSheet(silent){
   var was = openRoom;
   openRoom = null;
+  sheetSig = null;
   $('sheet').hidden = true;
   if (was && tiles[was]) {
     tiles[was].el.removeAttribute('aria-expanded');
@@ -652,13 +853,29 @@ function closeSheet(silent){
 $('sheet-close').addEventListener('click', function(){ closeSheet(false); });
 $('sheet-rows').addEventListener('click', function(e){
   var b = e.target.closest('button[data-act]');
-  if (!b) return;
-  if (b.dataset.act === 'ack') store.ack(b.dataset.id);
-  else store.close(b.dataset.id);
-  if (openRoom) $('sheet-title').focus();
+  if (!b || b.disabled) return;
+  b.disabled = true;
+  var done = b.dataset.act === 'ack' ? store.ack(b.dataset.id) : store.close(b.dataset.id);
+  done.then(function(){
+    b.disabled = false;
+    if (openRoom) $('sheet-title').focus();
+  });
 });
 document.addEventListener('keydown', function(e){
   if (e.key === 'Escape' && openRoom) closeSheet(false);
+});
+
+$('pin-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  var input = $('pin'), msg = $('pin-msg');
+  msg.textContent = '';
+  store.unlock(input.value).then(function(result){
+    input.value = '';
+    if (result === 'wrong') msg.textContent = 'That PIN didn’t work.';
+    else if (result === 'too_many') msg.textContent = 'Too many tries. Wait 10 minutes, then try again.';
+    else if (result === 'offline') msg.textContent = 'Can’t reach the server. Check the connection, then try again.';
+    if (result !== 'ok' && result !== 'setup') input.focus();
+  });
 });
 
 /* =====================================================================
@@ -675,20 +892,20 @@ function showView(next){
   $('room-pick').hidden = isBoard;
   $('seed').hidden = !isBoard;
   $('clear').hidden = !isBoard;
-  if (isBoard) { document.documentElement.lang = 'en'; tickBoard(); }
+  if (isBoard) { document.documentElement.lang = 'en'; renderBoardState(); tickBoard(); }
   else { closeSheet(true); renderPatient(); }
 }
 
 function seedSamples(){
   var now = Date.now(), m = 60 * 1000;
-  store.add('3',  'pillow',   now - 40 * 1000);
-  store.add('7',  'blanket',  now - (6 * m + 12 * 1000));
-  store.add('15', 'bathroom', now - 1 * m);
-  store.add('18', 'water',    now - 11 * m);
-  store.add('18', 'blanket',  now - 3 * m);
-  store.add('21', 'blanket',  now - 4 * m, now - 2 * m);
-  store.add('42B','charger',  now - 2 * m);
-  store.add('C2', 'blanket',  now - 7 * m);
+  store.seed('3',  'pillow',   now - 40 * 1000);
+  store.seed('7',  'blanket',  now - (6 * m + 12 * 1000));
+  store.seed('15', 'bathroom', now - 1 * m);
+  store.seed('18', 'water',    now - 11 * m);
+  store.seed('18', 'blanket',  now - 3 * m);
+  store.seed('21', 'blanket',  now - 4 * m, now - 2 * m);
+  store.seed('42B','charger',  now - 2 * m);
+  store.seed('C2', 'blanket',  now - 7 * m);
 }
 
 if (demo) {
@@ -708,14 +925,13 @@ if (demo) {
 }
 
 var ackSeen = {};
-store.list().forEach(function(r){ if (r.ackAt) ackSeen[r.id] = true; });
 store.subscribe(function(){
-  if (view === 'board') { renderSheet(); tickBoard(); }
+  if (view === 'board') { renderBoardState(); renderSheet(); tickBoard(); }
   else {
     // announce "on the way" once when the team picks up this room's request
-    var newlyAcked = store.list().some(function(r){
-      if (r.room === room && r.ackAt && !ackSeen[r.id]) { ackSeen[r.id] = true; return true; }
-      return false;
+    var newlyAcked = false;
+    store.list().forEach(function(r){
+      if (r.room === room && r.ackAt && !ackSeen[r.id]) { ackSeen[r.id] = true; newlyAcked = true; }
     });
     renderPatient();
     if (newlyAcked) elLive.textContent = T[lang].ackLive;
@@ -724,6 +940,10 @@ store.subscribe(function(){
 
 buildBoard();
 showView(view);
+if (!demo) {
+  if (view === 'board') store.start({ board:true });
+  else if (room) store.start({ room:room });
+}
 setInterval(function(){ if (view === 'board') tickBoard(); }, 1000);
 
 })();
