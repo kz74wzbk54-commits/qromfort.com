@@ -25,10 +25,6 @@
   --line:#D3DCDD;
   --tide:#36757A;
   --press:rgba(54,117,122,.09);
-  --wool:#EADFCF;
-  --wool-edge:#CDB48D;
-  --honey:#98662B;
-  --weave:rgba(120,88,40,.05);
   --sage-bg:#DDEBE3;
   --sage:#2F7352;
   --sage-edge:#A9CDB9;
@@ -53,7 +49,6 @@
   :root:not([data-theme="light"]){
     --bg:#10181C; --ink:#E4EBED; --ink-soft:#9DADB5; --line:#27353C;
     --tide:#86C5C9; --press:rgba(134,197,201,.10);
-    --wool:#2A251D; --wool-edge:#5B4B33; --honey:#E0B070; --weave:rgba(255,235,200,.035);
     --sage-bg:#162B24; --sage:#7FD3A6; --sage-edge:#2F5846;
     --rose:#F0A19A; --rose-bg:#2F1B1D; --focus:#8DB8F0;
   }
@@ -61,7 +56,6 @@
 :root[data-theme="dark"]{
   --bg:#10181C; --ink:#E4EBED; --ink-soft:#9DADB5; --line:#27353C;
   --tide:#86C5C9; --press:rgba(134,197,201,.10);
-  --wool:#2A251D; --wool-edge:#5B4B33; --honey:#E0B070; --weave:rgba(255,235,200,.035);
   --sage-bg:#162B24; --sage:#7FD3A6; --sage-edge:#2F5846;
   --rose:#F0A19A; --rose-bg:#2F1B1D; --focus:#8DB8F0;
 }
@@ -87,50 +81,53 @@ button{cursor:pointer}
 .demo :focus-visible{outline:3px solid #8DB8F0;outline-offset:2px}
 
 /* ---------- Patient page ---------- */
-.patient{max-width:28rem;margin:0 auto;padding:1rem 1.25rem 3rem}
+.patient{max-width:28rem;margin:0 auto;padding:1rem 1.25rem 2.5rem}
 .lang{display:flex;flex-wrap:wrap;gap:0 1.25rem;margin:0 0 1.75rem}
 .lang button{background:none;border:0;border-radius:.25rem;padding:0;min-height:44px;display:inline-flex;align-items:center;color:var(--ink-soft);font-size:.9375rem}
 .lang button[aria-pressed="true"]{color:var(--ink);font-weight:700;text-decoration:underline;text-decoration-color:var(--tide);text-decoration-thickness:2px;text-underline-offset:.45em}
-.where{margin:0 0 .4rem;color:var(--ink-soft)}
-.patient h1{font-family:var(--serif);font-weight:400;font-size:clamp(1.75rem,7.4vw,2.125rem);line-height:1.2;margin:0 0 1.25rem;text-wrap:balance}
-.emergency{margin:0 0 1.75rem;padding-left:.875rem;border-left:2px solid var(--rose);color:var(--ink-soft);font-size:.9375rem;line-height:1.45}
-.emergency strong{color:var(--rose)}
-.fail{margin:0 0 1.25rem;padding:.75rem .875rem;border-radius:.75rem;background:var(--rose-bg);color:var(--ink);font-weight:700}
-.seen{margin:0 0 .75rem}
-.seen h2{font-size:1rem;margin:0}
-.seen p{margin:.15rem 0 0;color:var(--ink-soft);font-size:.9375rem}
+.where{margin:0 0 .3rem;color:var(--ink-soft);font-size:.875rem}
+.patient h1{font-family:var(--serif);font-weight:400;font-size:clamp(1.75rem,7.4vw,2.125rem);line-height:1.12;margin:0 0 1rem;text-wrap:balance}
+.emergency{margin:0;color:var(--ink-soft);font-size:.875rem;line-height:1.45}
+.emergency strong{color:var(--ink)}
+.fail{margin:1rem 0 0;padding:.75rem .875rem;border-radius:.75rem;background:var(--rose-bg);color:var(--ink);font-weight:700}
+.soon{margin:.5rem 0 0;color:var(--ink-soft);font-size:.875rem}
 
+.list{list-style:none;margin:1.5rem 0 0;padding:0}
+.list>li+li{border-top:1px solid var(--line)}
+.list>li.is-state,.list>li.is-state+li{border-top-color:transparent}
 .choice{appearance:none;display:flex;align-items:center;gap:1rem;width:100%;min-height:4rem;margin:0;padding:.75rem .5rem;background:none;border:0;border-radius:.75rem;color:var(--ink);font-size:1.0625rem;line-height:1.3;text-align:left}
 .choice svg{width:1.6rem;height:1.6rem;flex:none;color:var(--tide);stroke-width:1.5}
-.choice:active{background:var(--press)}
-@media (hover:hover){.choice:hover{background:var(--press)}}
+button.choice:active{background:var(--press)}
+@media (hover:hover){button.choice:hover{background:var(--press)}}
 .choice.is-busy{opacity:.6}
-.choice--blanket{min-height:5.25rem;margin:0 0 1.25rem;padding:1rem 1.25rem;border-radius:1.125rem;background-color:var(--wool);background-image:repeating-linear-gradient(90deg,var(--weave) 0 1px,transparent 1px 6px);box-shadow:inset 0 0 0 1px var(--wool-edge);font-family:var(--serif);font-size:1.3125rem;line-height:1.25}
-.choice--blanket svg{width:2.1rem;height:2.1rem;color:var(--honey);stroke-width:1.4}
-.choice--blanket:active,.choice--blanket:hover{background-color:var(--wool)}
-.list{list-style:none;margin:0;padding:0}
-.list>li+li{border-top:1px solid var(--line)}
 
-.asked-list{list-style:none;margin:0 0 1.25rem;padding:0;display:grid;gap:.75rem}
-.asked{display:flex;align-items:flex-start;gap:1rem;padding:1rem 1.25rem;border-radius:1.125rem;background:var(--wool);box-shadow:inset 0 0 0 1px var(--wool-edge)}
-.asked.is-ack{background:var(--sage-bg);box-shadow:inset 0 0 0 1px var(--sage-edge)}
-.asked>svg{width:1.8rem;height:1.8rem;flex:none;margin-top:.1rem;color:var(--honey);stroke-width:1.5}
-.asked.is-ack>svg{color:var(--sage)}
-.asked .body{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
-.asked .lbl{font-weight:700}
+.choice--state{align-items:flex-start;min-height:0;padding:.9rem .5rem .6rem;background:var(--press)}
+.choice--state.is-ack{background:var(--sage-bg)}
+.choice--state>svg{margin-top:.1rem}
+.choice--state.is-ack svg{color:var(--sage)}
+.choice--state .body{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
+.choice--state .lbl{font-weight:700}
 .status{display:flex;align-items:flex-start;gap:.5rem;font-size:.9375rem;color:var(--ink-soft)}
-.status i{width:.5rem;height:.5rem;border-radius:50%;background:var(--honey);flex:none;margin-top:.5rem}
+.status i{width:.5rem;height:.5rem;border-radius:50%;background:var(--tide);flex:none;margin-top:.5rem}
 .status .tick{width:1rem;height:1rem;flex:none;margin-top:.25rem}
 .is-ack .status{color:var(--sage);font-weight:700}
 .note{color:var(--ink-soft);font-size:.9375rem}
 .cancel{background:none;border:0;padding:.5rem 0;min-height:44px;align-self:flex-start;color:var(--ink);font-size:.9375rem;text-align:left;text-decoration:underline;text-underline-offset:.2em}
-.asked.settle{animation:settle .45s ease-out}
-@keyframes settle{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.choice--state.settle{animation:settle .6s ease-out}
+@keyframes settle{from{opacity:.4;background-color:transparent}}
 
-.foot{margin-top:2.5rem;color:var(--ink-soft);font-size:.875rem}
-.foot p{margin:0}
-.foot .mark{display:inline-flex;align-items:center;gap:.5rem;margin-bottom:.4rem;color:var(--ink);font-weight:700}
-.foot .mark svg{width:1.25rem;height:1.25rem;color:var(--tide)}
+.more{display:flex;flex-wrap:wrap;gap:0 1.75rem;margin:1.25rem 0 0}
+.more a{display:inline-flex;align-items:center;min-height:44px;color:var(--tide);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.3em}
+.landing .more{margin:0}
+.foot{margin-top:1.75rem;color:var(--ink-soft)}
+.partners{display:flex;flex-wrap:wrap;align-items:center;gap:0 1.75rem;margin:0 0 .5rem}
+.partners a{display:inline-flex;align-items:center;min-height:44px;color:var(--ink-soft);font-size:.875rem;font-weight:700;text-decoration:none}
+.partners img{display:block;height:1.5rem;width:auto;max-width:7.5rem;filter:grayscale(1);opacity:.75}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .partners img{filter:grayscale(1) invert(1);opacity:.7}}
+:root[data-theme="dark"] .partners img{filter:grayscale(1) invert(1);opacity:.7}
+.foot p{margin:0 0 .6rem;font-size:.8125rem}
+.foot .mark{display:inline-flex;align-items:center;gap:.4rem;font-size:.8125rem;opacity:.75}
+.foot .mark svg{width:1.1rem;height:1.1rem;color:var(--tide)}
 .landing{display:flex;flex-direction:column;gap:1.25rem;padding-top:16vh}
 .landing svg{width:3rem;height:3rem;color:var(--tide)}
 .landing h1{margin:0}
@@ -300,6 +297,15 @@ var REQUESTS = [
   { id:'charger',  staff:'Phone charger',            floor:0 },
   { id:'bathroom', staff:'Bathroom help',            floor:1 },
   { id:'other',    staff:'Stop by',                  floor:0 }
+];
+// Sister sites. They open in a new tab so the patient's request page stays put.
+var LINKS = { team:'https://yourerteam.com', qrudos:'https://qrudos.com' };
+// Footer logos. Put the image files in a /logos folder (svg or png, transparent background).
+// If a file is missing the name shows as plain text instead.
+var PARTNERS = [
+  { name:'Holy Cross Health', url:'https://www.holy-cross.com',    logo:'logos/holy-cross.svg' },
+  { name:'Trinity Health',    url:'https://www.trinityhealth.org', logo:'logos/trinity.svg' },
+  { name:'Vituity',           url:'https://www.vituity.com',       logo:'logos/vituity.svg' }
 ];
 var REQ = {};
 REQUESTS.forEach(function(r){ REQ[r.id] = r; });
@@ -496,54 +502,66 @@ var LOCALE = { en:'en-US', es:'es-US', ht:'en-US', pt:'pt-BR' };
 var T = {
   en:{
     kind:{bed:'Room',chair:'Chair',triage:'Triage'}, q:'What would make you more comfortable?',
-    emNoBell:'Tell any staff member right away. Don’t wait on this page.',
-    emLead:'Emergency?', em:'Press your call button or call out for staff. Don’t wait on this page.',
-    blanket:'I’d like a warm blanket', pillow:'A pillow', water:'Water or ice', lights:'Lights dimmed',
-    charger:'A phone charger', bathroom:'Help to the bathroom', other:'Something else. Please stop by.',
-    seen:'Your care team can see this', first:'Emergencies come first, so it may take a few minutes.',
-    open:'Asked at {t}. Waiting for someone to pick it up.', ack:'Someone is on the way.',
-    cancel:'Cancel this request', waterNote:'Your nurse will check that it’s safe for you to drink first.',
-    fine:'Only where you are and your request are sent. No name, no health details.',
+    emLead:'Need urgent help?', em:'Please use your call button or call out to staff. Don’t wait on this page.',
+    emNoBell:'Please tell any staff member right away. Don’t wait on this page.',
+    blanket:'A warm blanket', pillow:'A pillow', water:'Water or ice', lights:'Lights dimmed',
+    charger:'A phone charger', bathroom:'Bathroom help', other:'Something else',
+    first:'Emergencies come first, so it may take a few minutes.',
+    open:'Sent at {t}. Your care team can see this.', ack:'Someone is on the way.',
+    cancel:'Cancel this request',
+    waterNote:'Your nurse will check that it’s safe for you to drink first.',
+    otherNote:'Someone will stop by. Tell us what you need and we’ll take care of it.',
+    fine:'No login. No personal information.',
     scan:'Scan the code next to you to start.', sentLive:'Request sent.', ackLive:'Someone is on the way.',
+    team:'Meet the team', qrudos:'Give Qrudos',
     sending:'Sending…', fail:'That didn’t send. Try again, or tell a staff member.'
   },
   es:{
     kind:{bed:'Habitación',chair:'Silla',triage:'Triaje'}, q:'¿Qué necesita para estar más a gusto?',
+    emLead:'¿Necesita ayuda urgente?', em:'Use el botón de llamada o avise al personal en voz alta. No espere en esta página.',
     emNoBell:'Avise de inmediato a cualquier miembro del personal. No espere en esta página.',
-    emLead:'¿Emergencia?', em:'Presione el botón de llamada o avise al personal en voz alta. No espere en esta página.',
-    blanket:'Quisiera una manta caliente', pillow:'Una almohada', water:'Agua o hielo', lights:'Menos luz',
-    charger:'Un cargador de teléfono', bathroom:'Ayuda para ir al baño', other:'Otra cosa. Por favor, pasen a verme.',
-    seen:'Su equipo de atención ya puede ver esto', first:'Las emergencias van primero, así que puede tardar unos minutos.',
-    open:'Pedido a las {t}. Esperando a que alguien lo atienda.', ack:'Alguien viene en camino.',
-    cancel:'Cancelar este pedido', waterNote:'Su enfermera o enfermero confirmará primero que puede beber.',
-    fine:'Solo se envían su ubicación y lo que pidió. Sin nombre ni datos de salud.',
+    blanket:'Una manta caliente', pillow:'Una almohada', water:'Agua o hielo', lights:'Menos luz',
+    charger:'Un cargador de teléfono', bathroom:'Ayuda con el baño', other:'Otra cosa',
+    first:'Las emergencias van primero, así que puede tardar unos minutos.',
+    open:'Enviado a las {t}. Su equipo de atención ya puede verlo.', ack:'Alguien viene en camino.',
+    cancel:'Cancelar este pedido',
+    waterNote:'Su enfermera o enfermero confirmará primero que puede beber.',
+    otherNote:'Alguien pasará a verle. Díganos qué necesita y nos encargaremos.',
+    fine:'Sin inicio de sesión. Sin datos personales.',
     scan:'Escanee el código que tiene al lado para empezar.', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.',
+    team:'Conozca al equipo', qrudos:'Dar un Qrudos',
     sending:'Enviando…', fail:'No se pudo enviar. Inténtelo de nuevo o avise a un miembro del personal.'
   },
   ht:{
     kind:{bed:'Chanm',chair:'Chèz',triage:'Triyaj'}, q:'Kisa ki ta fè w santi w pi alèz?',
+    emLead:'Ou bezwen èd ijan?', em:'Peze bouton pou rele a oswa rele anplwaye yo byen fò. Pa tann sou paj sa a.',
     emNoBell:'Di nenpòt anplwaye sa touswit. Pa tann sou paj sa a.',
-    emLead:'Ijans?', em:'Peze bouton pou rele enfimyè a, oswa rele byen fò. Pa tann sou paj sa a.',
-    blanket:'Mwen ta renmen yon lenn cho', pillow:'Yon zòrye', water:'Dlo oswa glas', lights:'Bese limyè a',
-    charger:'Yon chajè telefòn', bathroom:'Èd pou ale nan twalèt', other:'Yon lòt bagay. Tanpri pase wè m.',
-    seen:'Ekip swen ou a ka wè sa kounye a', first:'Ijans yo pase anvan, kidonk sa ka pran kèk minit.',
-    open:'Ou mande sa a {t}. N ap tann yon moun reponn.', ack:'Yon moun ap vini.',
-    cancel:'Anile demann sa a', waterNote:'Enfimyè ou a ap verifye anvan si ou ka bwè.',
-    fine:'Se sèlman kote ou ye a ak sa ou mande a ki voye. Pa gen non, pa gen enfòmasyon sante.',
+    blanket:'Yon lenn cho', pillow:'Yon zòrye', water:'Dlo oswa glas', lights:'Bese limyè a',
+    charger:'Yon chajè telefòn', bathroom:'Èd nan twalèt', other:'Yon lòt bagay',
+    first:'Ijans yo pase anvan, kidonk sa ka pran kèk minit.',
+    open:'Voye a {t}. Ekip swen ou a ka wè sa.', ack:'Yon moun ap vini.',
+    cancel:'Anile demann sa a',
+    waterNote:'Enfimyè ou a ap verifye anvan si ou ka bwè.',
+    otherNote:'Yon moun ap pase wè ou. Di nou sa ou bezwen epi n ap okipe sa.',
+    fine:'Pa gen kont. Pa gen enfòmasyon pèsonèl.',
     scan:'Eskane kòd ki bò kote w la pou kòmanse.', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.',
+    team:'Rankontre ekip la', qrudos:'Bay yon Qrudos',
     sending:'N ap voye…', fail:'Sa pa voye. Eseye ankò, oswa di yon anplwaye sa.'
   },
   pt:{
     kind:{bed:'Quarto',chair:'Cadeira',triage:'Triagem'}, q:'O que deixaria você mais confortável?',
+    emLead:'Precisa de ajuda urgente?', em:'Use o botão de chamada ou chame a equipe em voz alta. Não espere nesta página.',
     emNoBell:'Avise imediatamente qualquer pessoa da equipe. Não espere nesta página.',
-    emLead:'Emergência?', em:'Aperte o botão de chamada ou chame a equipe em voz alta. Não espere nesta página.',
-    blanket:'Gostaria de um cobertor quente', pillow:'Um travesseiro', water:'Água ou gelo', lights:'Luz mais baixa',
-    charger:'Um carregador de celular', bathroom:'Ajuda para ir ao banheiro', other:'Outra coisa. Por favor, passem aqui.',
-    seen:'Sua equipe já pode ver isto', first:'Emergências vêm primeiro, então pode levar alguns minutos.',
-    open:'Pedido às {t}. Aguardando alguém atender.', ack:'Alguém está a caminho.',
-    cancel:'Cancelar este pedido', waterNote:'A enfermagem vai confirmar antes se você pode beber.',
-    fine:'Só o lugar onde você está e o seu pedido são enviados. Sem nome, sem dados de saúde.',
+    blanket:'Um cobertor quente', pillow:'Um travesseiro', water:'Água ou gelo', lights:'Luz mais baixa',
+    charger:'Um carregador de celular', bathroom:'Ajuda no banheiro', other:'Outra coisa',
+    first:'Emergências vêm primeiro, então pode levar alguns minutos.',
+    open:'Enviado às {t}. Sua equipe já pode ver.', ack:'Alguém está a caminho.',
+    cancel:'Cancelar este pedido',
+    waterNote:'A enfermagem vai confirmar antes se você pode beber.',
+    otherNote:'Alguém vai passar aí. Diga o que precisa e vamos cuidar disso.',
+    fine:'Sem login. Sem dados pessoais.',
     scan:'Escaneie o código ao seu lado para começar.', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.',
+    team:'Conheça a equipe', qrudos:'Dar um Qrudos',
     sending:'Enviando…', fail:'Não foi enviado. Tente de novo ou avise alguém da equipe.'
   }
 };
@@ -599,6 +617,27 @@ function focusKeyNow(){
   return a.dataset.ask || (card && card.dataset.card) || (a.dataset.lang ? 'lang:' + a.dataset.lang : null);
 }
 
+function partnerLinks(){
+  return '<div class="partners">' + PARTNERS.map(function(p){
+    return '<a href="' + p.url + '" target="_blank" rel="noopener"><img src="' + p.logo + '" alt="' + p.name + '"></a>';
+  }).join('') + '</div>';
+}
+function moreLinks(t){
+  return '<div class="more">' +
+    '<a href="' + LINKS.team + '" target="_blank" rel="noopener">' + t.team + '</a>' +
+    '<a href="' + LINKS.qrudos + '" target="_blank" rel="noopener">' + t.qrudos + '</a>' +
+  '</div>';
+}
+// A logo file that is missing falls back to .png, then to the name as plain text.
+elPatient.addEventListener('error', function(e){
+  var img = e.target;
+  if (!img || img.tagName !== 'IMG') return;
+  if (/\.svg$/i.test(img.getAttribute('src') || '')) { img.setAttribute('src', img.getAttribute('src').replace(/\.svg$/i, '.png')); return; }
+  var label = document.createElement('span');
+  label.textContent = img.alt;
+  img.replaceWith(label);
+}, true);
+
 function renderPatient(focusType){
   var t = T[lang];
   document.documentElement.lang = lang;
@@ -610,37 +649,38 @@ function renderPatient(focusType){
       }).join('') +
     '</div>';
 
+  var foot = function(withNote){
+    return '<footer class="foot">' + partnerLinks() +
+      (withNote ? '<p>' + t.fine + '</p>' : '') +
+      '<span class="mark">' + ICON.mark + 'Qromfort</span></footer>';
+  };
+
   var html;
   if (!room) {
-    html = langs + '<div class="landing">' + ICON.mark + '<h1>' + t.scan + '</h1></div>';
+    html = langs + '<div class="landing">' + ICON.mark + '<h1>' + t.scan + '</h1>' + moreLinks(t) + '</div>' + foot(false);
   } else {
     var spot = SPOT[room];
     var mine = {};
     store.list().forEach(function(r){ if (r.room === room) mine[r.type] = r; });
     var any = Object.keys(mine).length > 0;
-
     var offered = REQUESTS.filter(function(d){ return !d.notFor || d.notFor.indexOf(spot.kind) < 0; });
-    var asked = REQUESTS.filter(function(d){ return mine[d.id]; })
-      .sort(function(a,b){ return mine[a.id].createdAt - mine[b.id].createdAt; });
-    var open = offered.filter(function(d){ return !mine[d.id]; });
-    var blanketOpen = open.filter(function(d){ return d.id === 'blanket'; })[0];
-    var others = open.filter(function(d){ return d.id !== 'blanket'; });
+    var notes = { water:t.waterNote, other:t.otherNote };
 
-    var choice = function(def, extra){
-      var busy = !!pending[def.id];
-      return '<button type="button" class="choice' + (extra || '') + (busy ? ' is-busy' : '') + '" data-ask="' + def.id + '"' + (busy ? ' aria-disabled="true"' : '') + '>' +
-        ICON[def.id] + '<span>' + (busy ? t.sending : t[def.id]) + '</span></button>';
-    };
-
-    var askedHtml = asked.map(function(def){
+    // every request is the same row; a sent one changes state where it stands
+    var rows = offered.map(function(def){
       var r = mine[def.id];
+      if (!r) {
+        var busy = !!pending[def.id];
+        return '<li><button type="button" class="choice' + (busy ? ' is-busy' : '') + '" data-ask="' + def.id + '"' + (busy ? ' aria-disabled="true"' : '') + '>' +
+          ICON[def.id] + '<span>' + (busy ? t.sending : t[def.id]) + '</span></button></li>';
+      }
       var acked = !!r.ackAt;
-      return '<li><div class="asked' + (acked ? ' is-ack' : ' is-open') + '" data-card="' + def.id + '" tabindex="-1">' +
+      return '<li class="is-state"><div class="choice choice--state' + (acked ? ' is-ack' : ' is-open') + '" data-card="' + def.id + '" tabindex="-1">' +
         ICON[def.id] +
         '<div class="body">' +
           '<span class="lbl">' + t[def.id] + '</span>' +
           '<span class="status">' + (acked ? ICON.check + '<span>' + t.ack + '</span>' : '<i aria-hidden="true"></i><span>' + t.open.replace('{t}', clock(r.createdAt)) + '</span>') + '</span>' +
-          (def.id === 'water' ? '<span class="note">' + t.waterNote + '</span>' : '') +
+          (notes[def.id] ? '<span class="note">' + notes[def.id] + '</span>' : '') +
           (store.canCancel(r) ? '<button type="button" class="cancel" data-cancel="' + r.id + '">' + t.cancel + '</button>' : '') +
         '</div></div></li>';
     }).join('');
@@ -650,10 +690,9 @@ function renderPatient(focusType){
       '<h1>' + t.q + '</h1>' +
       '<p class="emergency"><strong>' + t.emLead + '</strong> ' + (spot.kind === 'bed' ? t.em : t.emNoBell) + '</p>' +
       (sendFailed ? '<p class="fail" role="alert">' + t.fail + '</p>' : '') +
-      (any ? '<div class="seen"><h2>' + t.seen + '</h2><p>' + t.first + '</p></div><ul class="asked-list">' + askedHtml + '</ul>' : '') +
-      (blanketOpen ? choice(blanketOpen, ' choice--blanket') : '') +
-      (others.length ? '<ul class="list">' + others.map(function(d){ return '<li>' + choice(d) + '</li>'; }).join('') + '</ul>' : '') +
-      '<footer class="foot"><span class="mark">' + ICON.mark + 'Qromfort</span><p>' + t.fine + '</p></footer>';
+      (any ? '<p class="soon">' + t.first + '</p>' : '') +
+      '<ul class="list">' + rows + '</ul>' +
+      moreLinks(t) + foot(true);
   }
 
   if (html === lastPatientHtml && !focusType) return;      // nothing changed: leave the page (and focus) alone
@@ -955,12 +994,16 @@ store.subscribe(function(){
   if (view === 'board') { renderBoardState(); renderSheet(); tickBoard(); }
   else {
     // announce "on the way" once when the team picks up this room's request
-    var newlyAcked = false;
+    var ackedTypes = [];
     store.list().forEach(function(r){
-      if (r.room === room && r.ackAt && !ackSeen[r.id]) { ackSeen[r.id] = true; newlyAcked = true; }
+      if (r.room === room && r.ackAt && !ackSeen[r.id]) { ackSeen[r.id] = true; ackedTypes.push(r.type); }
     });
     renderPatient();
-    if (newlyAcked) elLive.textContent = T[lang].ackLive;
+    ackedTypes.forEach(function(ty){
+      var c = elPatient.querySelector('[data-card="' + ty + '"]');
+      if (c) c.classList.add('settle');
+    });
+    if (ackedTypes.length) elLive.textContent = T[lang].ackLive;
   }
 });
 
