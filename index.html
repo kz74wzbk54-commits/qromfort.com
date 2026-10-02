@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Qromfort</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+
+  /* Patient side: night indigo + lamp amber */
+  --bg:#F2F1FA;
+  --surface:#FFFFFF;
+  --ink:#1C1A3B;
+  --ink-soft:#55527A;
+  --line:#D5D2EC;
+  --lamp:#FFC24D;
+  --lamp-edge:#D9951A;
+  --lamp-ink:#2B1D00;
+  --wait-bg:#FFF4D9;
+  --alert:#A8201A;
+  --alert-bg:#FCECEA;
+  --go:#17794A;
+  --go-bg:#E4F6EC;
+  --focus:#3B2FD0;
+
+  /* Staff board: a monitor is black in any theme */
+  --m-bg:#000000;
+  --m-panel:#131316;
+  --m-line:#26262B;
+  --m-idle:#4A4A52;
+  --m-dim:#9A9AA4;
+  --m-text:#EDEDF0;
+  --m-new:#35D6F0;
+  --m-wait:#FFD60A;
+  --m-over:#FF4D42;
+  --m-ack:#3BE07A;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#14132B; --surface:#201E44; --ink:#F1EFFF; --ink-soft:#B6B2DA; --line:#3A3768;
+    --wait-bg:#3A2F12; --alert:#FF9C93; --alert-bg:#3A1A22; --go:#6BE5A4; --go-bg:#153526; --focus:#B9B2FF;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14132B; --surface:#201E44; --ink:#F1EFFF; --ink-soft:#B6B2DA; --line:#3A3768;
+  --wait-bg:#3A2F12; --alert:#FF9C93; --alert-bg:#3A1A22; --go:#6BE5A4; --go-bg:#153526; --focus:#B9B2FF;
+}
+
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:1.0625rem;line-height:1.45}
+body.is-board{background:var(--m-bg);color:var(--m-text)}
+[hidden]{display:none!important}
+button,select{font:inherit}
+button{cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- Prototype bar (scaffolding, not part of the product) ---------- */
+.demo{background:#0C0B1A;color:#D9D6F2;padding:.5rem .75rem;display:flex;flex-wrap:wrap;gap:.5rem .75rem;align-items:center;font-size:.875rem;border-bottom:1px solid #2A2850}
+.demo-tag{font-weight:700}
+.seg{display:inline-flex;border:1px solid #4A4780;border-radius:999px;overflow:hidden}
+.seg button{background:transparent;color:#D9D6F2;border:0;padding:.5rem .875rem;min-height:40px}
+.seg button[aria-pressed="true"]{background:#F1EFFF;color:#14132B;font-weight:700}
+.demo label{display:inline-flex;align-items:center;gap:.4rem}
+.demo select,.demo .ghost{background:#1B1A38;color:#F1EFFF;border:1px solid #4A4780;border-radius:.5rem;padding:.4rem .6rem;min-height:40px}
+.demo :focus-visible{outline:3px solid #FFC24D;outline-offset:2px}
+
+/* ---------- Patient page ---------- */
+.patient{max-width:30rem;margin:0 auto;padding:1rem 1rem 2.5rem}
+.p-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem}
+.mark{display:inline-flex;align-items:center;gap:.5rem;font-weight:700;font-size:1.125rem}
+.mark svg{width:1.6rem;height:1.6rem;color:var(--lamp-edge)}
+.lang{display:flex;flex-wrap:wrap;gap:.3rem}
+.lang button{border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:.35rem .6rem;font-size:.875rem;min-height:40px}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
+.room{margin:1.5rem 0 0;color:var(--ink-soft);font-weight:700}
+.patient h1{font-size:clamp(1.6rem,6.6vw,2rem);line-height:1.15;margin:.2rem 0 .875rem;text-wrap:balance}
+.emergency{margin:0 0 1rem;padding:.625rem .75rem;border-left:4px solid var(--alert);background:var(--alert-bg);border-radius:0 .5rem .5rem 0;font-size:.9375rem}
+.emergency strong{color:var(--alert)}
+.seen{margin:0 0 .75rem;padding:0}
+.seen h2{font-size:1.0625rem;margin:0 0 .15rem}
+.seen p{margin:0;font-size:.9375rem;color:var(--ink-soft)}
+
+.options{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.opt{appearance:none;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);border-radius:1rem;padding:.875rem;min-height:5.75rem;display:flex;flex-direction:column;align-items:flex-start;gap:.5rem;text-align:left;font-weight:700;font-size:1.0625rem;line-height:1.2}
+.opt svg{width:1.75rem;height:1.75rem;flex:none}
+button.opt:active{transform:translateY(2px)}
+.opt--hero,.opt--wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:.875rem}
+.opt--wide{min-height:4.25rem}
+button.opt--hero{background:var(--lamp);color:var(--lamp-ink);border-color:var(--lamp-edge);border-radius:1.25rem;min-height:6.5rem;font-size:1.375rem;padding:1rem 1.125rem;box-shadow:0 6px 0 var(--lamp-edge);margin-bottom:6px;transition:transform .08s,box-shadow .08s}
+button.opt--hero svg{width:2.5rem;height:2.5rem}
+button.opt--hero:active{transform:translateY(4px);box-shadow:0 2px 0 var(--lamp-edge)}
+.opt :is(.status,.note){font-weight:400;font-size:.9375rem;line-height:1.3;display:block}
+.opt .note{color:var(--ink-soft)}
+.asked-list{display:grid;gap:.75rem;margin:0 0 1rem}
+.opt.asked{flex-direction:row;align-items:flex-start;gap:.875rem;min-height:0}
+.opt.is-open{background:var(--wait-bg);border-color:var(--lamp-edge)}
+.opt.is-ack{background:var(--go-bg);border-color:var(--go)}
+.opt.is-ack .status{color:var(--go);font-weight:700}
+.opt .body{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:0}
+.cancel{background:none;border:0;padding:.25rem 0;min-height:40px;color:var(--ink);text-decoration:underline;text-underline-offset:.2em;font-size:.9375rem;align-self:flex-start;text-align:left;font-weight:700}
+.fine{margin:1.5rem 0 0;font-size:.875rem;color:var(--ink-soft)}
+.patient :focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.patient [tabindex="-1"]:focus{outline:3px solid var(--focus);outline-offset:3px}
+
+/* ---------- Staff board ---------- */
+.board{max-width:72rem;margin:0 auto;padding:1rem 1rem 6rem}
+.b-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.25rem 1.25rem;margin-bottom:.875rem}
+.b-head h1{font-size:1.125rem;margin:0;display:inline-flex;align-items:center;gap:.5rem}
+.b-head h1 svg{width:1.4rem;height:1.4rem}
+.b-sum{margin:0;color:var(--m-dim);font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(6.25rem,1fr));grid-auto-rows:1fr;gap:.5rem}
+.area{font-size:.9375rem;font-weight:700;color:var(--m-dim);margin:1.25rem 0 .5rem}
+.area:first-child{margin-top:0}
+.tile{appearance:none;background:#000;color:var(--m-idle);border:2px solid var(--m-line);border-radius:.375rem;min-height:6rem;padding:.5rem .55rem;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;text-align:left;min-width:0}
+.tile:disabled{cursor:default}
+.tile .n{font-size:2.125rem;font-weight:700;line-height:.95;font-variant-numeric:tabular-nums}
+.tile .what{font-size:.8125rem;line-height:1.15;color:var(--m-text);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tile .t{font-size:1rem;font-weight:700;font-variant-numeric:tabular-nums;min-height:1.2em}
+.tile[data-level]{color:var(--c);border-color:var(--c)}
+.tile[data-level="new"]{--c:var(--m-new)}
+.tile[data-level="wait"]{--c:var(--m-wait);background:#1A1600}
+.tile[data-level="ack"]{--c:var(--m-ack)}
+.tile[data-level="over"]{--c:var(--m-over);background:var(--m-over);color:#000;animation:alarm 1.4s steps(1,end) infinite}
+.tile[data-level="over"] .what{color:inherit;font-weight:700}
+.tile[aria-expanded="true"]{outline:3px solid #fff;outline-offset:2px}
+@media (max-width:32rem){
+  .grid{grid-template-columns:repeat(4,1fr);gap:.375rem}
+  .tile{min-height:5.25rem;padding:.4rem .4rem}
+  .tile .n{font-size:1.5rem}
+  .tile .what{font-size:.75rem}
+  .tile .t{font-size:.875rem}
+}
+@keyframes alarm{
+  0%{background:var(--m-over);color:#000}
+  50%{background:#2A0503;color:var(--m-over)}
+}
+@media (prefers-reduced-motion:reduce){.tile[data-level="over"]{animation:none}}
+.legend{display:flex;flex-wrap:wrap;gap:.4rem 1.25rem;margin:1rem 0 0;padding:0;list-style:none;color:var(--m-dim);font-size:.875rem}
+.legend li{display:inline-flex;align-items:center;gap:.45rem}
+.legend i{width:.85rem;height:.85rem;border-radius:2px;border:2px solid var(--c);display:inline-block}
+.legend .fill{background:var(--c)}
+.board :focus-visible{outline:3px solid #fff;outline-offset:2px}
+
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--m-panel);color:var(--m-text);border-top:3px solid var(--c,var(--m-line));padding:1rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));max-height:70vh;overflow:auto}
+.sheet-in{max-width:40rem;margin:0 auto}
+.sheet-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.5rem}
+.sheet h2{font-size:1.5rem;margin:0}
+.sheet h2:focus{outline:none}
+.x{background:transparent;color:var(--m-text);border:1.5px solid #4A4A52;border-radius:.5rem;padding:.4rem .875rem;min-height:44px}
+.row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.6rem 1rem;padding:.75rem 0;border-top:1px solid var(--m-line)}
+.row-what{display:flex;flex-direction:column}
+.row-what strong{font-size:1.0625rem}
+.row-what span{color:var(--m-dim);font-size:.9375rem;font-variant-numeric:tabular-nums}
+.row-acts{display:flex;gap:.5rem}
+.row-acts button{min-height:48px;padding:.5rem 1rem;border-radius:.5rem;font-weight:700;border:2px solid var(--m-text);background:transparent;color:var(--m-text)}
+.row-acts .go{background:var(--m-ack);border-color:var(--m-ack);color:#00210E}
+.sheet :focus-visible{outline:3px solid #fff;outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="demo" id="demo" hidden>
+  <span class="demo-tag">Prototype</span>
+  <div class="seg" role="group" aria-label="Which screen to show">
+    <button type="button" id="seg-patient" aria-pressed="true">Patient phone</button>
+    <button type="button" id="seg-board" aria-pressed="false">Staff board</button>
+  </div>
+  <label id="room-pick">Scanned code
+    <select id="room-select"></select>
+  </label>
+  <button type="button" class="ghost" id="seed" hidden>Add sample requests</button>
+  <button type="button" class="ghost" id="clear" hidden>Clear all</button>
+</div>
+
+<p id="live" class="sr-only" aria-live="polite"></p>
+
+<main class="patient" id="patient"></main>
+
+<main class="board" id="board" hidden>
+  <div class="b-head">
+    <h1>
+      <svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="3" y="3" width="19" height="19" rx="5" stroke="currentColor" stroke-width="3"/><rect x="9.5" y="9.5" width="6" height="6" rx="1" fill="currentColor"/><path d="M19 19l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+      Qromfort board
+    </h1>
+    <p class="b-sum" id="b-sum"></p>
+  </div>
+  <div id="areas"></div>
+  <ul class="legend" aria-label="What the colors mean">
+    <li style="--c:var(--m-new)"><i></i>New, under 5 min</li>
+    <li style="--c:var(--m-wait)"><i></i>5 to 10 min, or bathroom help</li>
+    <li style="--c:var(--m-over)"><i class="fill"></i>! Over 10 min</li>
+    <li style="--c:var(--m-ack)"><i></i>✓ Someone is on the way</li>
+  </ul>
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-in">
+      <div class="sheet-top">
+        <h2 id="sheet-title" tabindex="-1"></h2>
+        <button type="button" class="x" id="sheet-close">Close</button>
+      </div>
+      <div id="sheet-rows"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   CONFIG — edit these for the real unit
+   ===================================================================== */
+// Every place a QR code can live. `id` is what goes in the QR link (?room=ID).
+var AREAS = [
+  { kind:'bed',    title:'Beds',                spots:[] },
+  { kind:'chair',  title:'Waiting room chairs', spots:[] },
+  { kind:'triage', title:'Triage',              spots:[] }
+];
+(function(){
+  for (var i = 1; i <= 50; i++) {
+    if (i === 42 || i === 43) {
+      AREAS[0].spots.push({ id:i + 'A', num:i + 'A' }, { id:i + 'B', num:i + 'B' });
+    } else {
+      AREAS[0].spots.push({ id:String(i), num:String(i) });
+    }
+  }
+  for (var c = 1; c <= 5; c++) AREAS[1].spots.push({ id:'C' + c, num:String(c) });
+  for (var t = 1; t <= 2; t++) AREAS[2].spots.push({ id:'T' + t, num:String(t) });
+})();
+var ROOMS = [], SPOT = {};
+var STAFF_KIND = { bed:'Room', chair:'Chair', triage:'Triage' };
+AREAS.forEach(function(a){
+  a.spots.forEach(function(sp){
+    sp.kind = a.kind;
+    sp.staff = STAFF_KIND[a.kind] + ' ' + sp.num;   // what staff see: "Room 42A", "Chair 3"
+    ROOMS.push(sp.id);
+    SPOT[sp.id] = sp;
+  });
+});
+
+var WAIT_AFTER = 5 * 60 * 1000;       // cyan -> yellow
+var OVER_AFTER = 10 * 60 * 1000;      // yellow -> red
+
+// `floor` is the lowest alarm level a request can start at (0 new, 1 waiting).
+var REQUESTS = [
+  { id:'blanket',  staff:'Warm blanket',             floor:0 },
+  { id:'pillow',   staff:'Pillow',                   floor:0 },
+  { id:'water',    staff:'Water or ice (check NPO)', short:'Water/ice, NPO?', floor:0 },
+  { id:'lights',   staff:'Lights dimmed',            floor:0, notFor:['chair'] },
+  { id:'charger',  staff:'Phone charger',            floor:0 },
+  { id:'bathroom', staff:'Bathroom help',            floor:1 },
+  { id:'other',    staff:'Stop by',                  floor:0 }
+];
+var REQ = {};
+REQUESTS.forEach(function(r){ REQ[r.id] = r; });
+
+/* =====================================================================
+   STORE — the only part that changes when the backend exists.
+   Today: this browser only (localStorage, synced across tabs).
+   Later: swap the bodies for fetch()/realtime calls; keep the same API.
+   ===================================================================== */
+var store = (function(){
+  var KEY = 'qromfort.requests.v1';
+  var mem = [];
+  var subs = [];
+  function load(){
+    try {
+      var raw = localStorage.getItem(KEY);
+      var v = raw ? JSON.parse(raw) : [];
+      mem = Array.isArray(v) ? v : [];
+    } catch (e) { /* storage unavailable: stay in memory */ }
+    var cutoff = Date.now() - 6 * 60 * 60 * 1000;   // drop anything stale
+    mem = mem.filter(function(r){ return r && r.createdAt > cutoff && REQ[r.type] && SPOT[r.room]; });
+  }
+  function save(next){
+    mem = next;
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) {}
+    notify();
+  }
+  function notify(){ subs.forEach(function(fn){ fn(); }); }
+  try {
+    window.addEventListener('storage', function(e){
+      if (e.key === KEY || e.key === null) { load(); notify(); }
+    });
+  } catch (e) {}
+  load();
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  return {
+    list: function(){ return mem.slice(); },
+    add: function(room, type, createdAt, ackAt){
+      var dup = mem.some(function(r){ return r.room === room && r.type === type; });
+      if (dup) return null;
+      var rec = { id:uid(), room:room, type:type, createdAt:createdAt || Date.now(), ackAt:ackAt || null };
+      save(mem.concat([rec]));
+      return rec;
+    },
+    ack: function(id){
+      save(mem.map(function(r){ return r.id === id ? Object.assign({}, r, { ackAt: Date.now() }) : r; }));
+    },
+    close: function(id){ save(mem.filter(function(r){ return r.id !== id; })); },
+    clear: function(){ save([]); },
+    subscribe: function(fn){ subs.push(fn); }
+  };
+})();
+
+/* =====================================================================
+   COPY — patient-facing, four languages
+   ===================================================================== */
+var LANGS = [['en','English'],['es','Español'],['ht','Kreyòl'],['pt','Português']];
+var LOCALE = { en:'en-US', es:'es-US', ht:'en-US', pt:'pt-BR' };
+var T = {
+  en:{
+    kind:{bed:'Room',chair:'Chair',triage:'Triage'}, q:'What would make you more comfortable?',
+    emNoBell:'Tell any staff member right away. Don’t wait on this page.',
+    emLead:'Emergency?', em:'Press your call button or call out for staff. Don’t wait on this page.',
+    blanket:'I’d like a warm blanket', pillow:'A pillow', water:'Water or ice', lights:'Lights dimmed',
+    charger:'A phone charger', bathroom:'Help to the bathroom', other:'Something else. Please stop by.',
+    seen:'Your care team can see this', first:'Emergencies come first, so it may take a few minutes.',
+    open:'Asked at {t}. Waiting for someone to pick it up.', ack:'Someone is on the way.',
+    cancel:'Cancel this request', waterNote:'Your nurse will check that it’s safe for you to drink first.',
+    fine:'Only where you are and your request are sent. No name, no health details.',
+    scan:'Scan the code next to you to start.', sentLive:'Request sent.', ackLive:'Someone is on the way.'
+  },
+  es:{
+    kind:{bed:'Habitación',chair:'Silla',triage:'Triaje'}, q:'¿Qué necesita para estar más a gusto?',
+    emNoBell:'Avise de inmediato a cualquier miembro del personal. No espere en esta página.',
+    emLead:'¿Emergencia?', em:'Presione el botón de llamada o avise al personal en voz alta. No espere en esta página.',
+    blanket:'Quisiera una manta caliente', pillow:'Una almohada', water:'Agua o hielo', lights:'Menos luz',
+    charger:'Un cargador de teléfono', bathroom:'Ayuda para ir al baño', other:'Otra cosa. Por favor, pasen a verme.',
+    seen:'Su equipo de atención ya puede ver esto', first:'Las emergencias van primero, así que puede tardar unos minutos.',
+    open:'Pedido a las {t}. Esperando a que alguien lo atienda.', ack:'Alguien viene en camino.',
+    cancel:'Cancelar este pedido', waterNote:'Su enfermera o enfermero confirmará primero que puede beber.',
+    fine:'Solo se envían su ubicación y lo que pidió. Sin nombre ni datos de salud.',
+    scan:'Escanee el código que tiene al lado para empezar.', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.'
+  },
+  ht:{
+    kind:{bed:'Chanm',chair:'Chèz',triage:'Triyaj'}, q:'Kisa ki ta fè w santi w pi alèz?',
+    emNoBell:'Di nenpòt anplwaye sa touswit. Pa tann sou paj sa a.',
+    emLead:'Ijans?', em:'Peze bouton pou rele enfimyè a, oswa rele byen fò. Pa tann sou paj sa a.',
+    blanket:'Mwen ta renmen yon lenn cho', pillow:'Yon zòrye', water:'Dlo oswa glas', lights:'Bese limyè a',
+    charger:'Yon chajè telefòn', bathroom:'Èd pou ale nan twalèt', other:'Yon lòt bagay. Tanpri pase wè m.',
+    seen:'Ekip swen ou a ka wè sa kounye a', first:'Ijans yo pase anvan, kidonk sa ka pran kèk minit.',
+    open:'Ou mande sa a {t}. N ap tann yon moun reponn.', ack:'Yon moun ap vini.',
+    cancel:'Anile demann sa a', waterNote:'Enfimyè ou a ap verifye anvan si ou ka bwè.',
+    fine:'Se sèlman kote ou ye a ak sa ou mande a ki voye. Pa gen non, pa gen enfòmasyon sante.',
+    scan:'Eskane kòd ki bò kote w la pou kòmanse.', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.'
+  },
+  pt:{
+    kind:{bed:'Quarto',chair:'Cadeira',triage:'Triagem'}, q:'O que deixaria você mais confortável?',
+    emNoBell:'Avise imediatamente qualquer pessoa da equipe. Não espere nesta página.',
+    emLead:'Emergência?', em:'Aperte o botão de chamada ou chame a equipe em voz alta. Não espere nesta página.',
+    blanket:'Gostaria de um cobertor quente', pillow:'Um travesseiro', water:'Água ou gelo', lights:'Luz mais baixa',
+    charger:'Um carregador de celular', bathroom:'Ajuda para ir ao banheiro', other:'Outra coisa. Por favor, passem aqui.',
+    seen:'Sua equipe já pode ver isto', first:'Emergências vêm primeiro, então pode levar alguns minutos.',
+    open:'Pedido às {t}. Aguardando alguém atender.', ack:'Alguém está a caminho.',
+    cancel:'Cancelar este pedido', waterNote:'A enfermagem vai confirmar antes se você pode beber.',
+    fine:'Só o lugar onde você está e o seu pedido são enviados. Sem nome, sem dados de saúde.',
+    scan:'Escaneie o código ao seu lado para começar.', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.'
+  }
+};
+
+function svg(inner){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+}
+var ICON = {
+  blanket: svg('<rect x="3" y="11" width="18" height="9" rx="2"/><path d="M3 15.5h18"/><path d="M8 3c-1 1.3 1 2.2 0 3.5M12 3c-1 1.3 1 2.2 0 3.5M16 3c-1 1.3 1 2.2 0 3.5"/>'),
+  pillow:  svg('<path d="M5 7c4 1 10 1 14 0 1.3 3 1.3 7 0 10-4-1-10-1-14 0-1.3-3-1.3-7 0-10z"/>'),
+  water:   svg('<path d="M7 4h10l-1.2 14.6a1.5 1.5 0 0 1-1.5 1.4H9.7a1.5 1.5 0 0 1-1.5-1.4z"/><path d="M7.5 10h9"/>'),
+  lights:  svg('<path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/>'),
+  charger: svg('<rect x="3" y="8" width="16" height="8" rx="2"/><path d="M21.5 11v2"/><path d="M12 9.8L9.8 12.3h2.6L10.2 14.6"/>'),
+  bathroom:svg('<rect x="5" y="3" width="5" height="8" rx="1"/><path d="M8 11h12a6 6 0 0 1-6 6h-2a4 4 0 0 1-4-4z"/><path d="M11.5 17v4h4.5v-4"/>'),
+  other:   svg('<path d="M4 5h16v11H10l-4 4v-4H4z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/>'),
+  mark: '<svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><rect x="3" y="3" width="19" height="19" rx="5" stroke="currentColor" stroke-width="3"/><rect x="9.5" y="9.5" width="6" height="6" rx="1" fill="currentColor"/><path d="M19 19l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>'
+};
+
+/* =====================================================================
+   MODE — the QR code decides the room.
+   Real use:  /?room=12  /?room=42A  /?room=C3  /?room=T1  (patient)   /?view=board  (staff)
+   No params: prototype mode with the switcher bar.
+   ===================================================================== */
+var params = new URLSearchParams(location.search);
+var qRoom = params.get('room');
+var qView = params.get('view');
+var demo = !qRoom && qView !== 'board';
+var view = qView === 'board' ? 'board' : 'patient';
+var room = ROOMS.indexOf(qRoom) > -1 ? qRoom : (demo ? '12' : null);
+
+var lang = 'en';
+try {
+  var saved = localStorage.getItem('qromfort.lang');
+  var nav = (navigator.language || 'en').slice(0,2).toLowerCase();
+  if (saved && T[saved]) lang = saved;
+  else if (T[nav]) lang = nav;
+} catch (e) {}
+
+function $(id){ return document.getElementById(id); }
+var elPatient = $('patient'), elBoard = $('board'), elLive = $('live');
+
+function clock(ts){
+  try { return new Date(ts).toLocaleTimeString(LOCALE[lang], { hour:'numeric', minute:'2-digit' }); }
+  catch (e) { return new Date(ts).toLocaleTimeString(); }
+}
+function elapsed(ms){
+  var s = Math.max(0, Math.floor(ms / 1000));
+  var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  var mm = h ? String(m).padStart(2,'0') : String(m);
+  return (h ? h + ':' : '') + mm + ':' + String(sec).padStart(2,'0');
+}
+
+/* =====================================================================
+   PATIENT PAGE
+   ===================================================================== */
+function renderPatient(focusType){
+  var t = T[lang];
+  document.documentElement.lang = lang;
+
+  var head =
+    '<div class="p-head">' +
+      '<span class="mark">' + ICON.mark + 'Qromfort</span>' +
+      '<div class="lang" role="group" aria-label="Language">' +
+        LANGS.map(function(l){
+          return '<button type="button" data-lang="' + l[0] + '" lang="' + l[0] + '" aria-pressed="' + (l[0] === lang) + '">' + l[1] + '</button>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+
+  if (!room) {
+    elPatient.innerHTML = head + '<h1 style="margin-top:2rem">' + t.scan + '</h1>';
+    return;
+  }
+
+  var mine = {};
+  store.list().forEach(function(r){ if (r.room === room) mine[r.type] = r; });
+  var any = Object.keys(mine).length > 0;
+
+  var spot = SPOT[room];
+  var offered = REQUESTS.filter(function(d){ return !d.notFor || d.notFor.indexOf(spot.kind) < 0; });
+  var asked = REQUESTS.filter(function(d){ return mine[d.id]; })
+    .sort(function(a,b){ return mine[a.id].createdAt - mine[b.id].createdAt; });
+  var open = offered.filter(function(d){ return !mine[d.id]; });
+  var small = open.filter(function(d){ return d.id !== 'blanket'; });
+
+  var askedHtml = asked.map(function(def){
+    var r = mine[def.id];
+    var acked = !!r.ackAt;
+    return '<div class="opt asked' + (acked ? ' is-ack' : ' is-open') + '" data-card="' + def.id + '" tabindex="-1">' +
+      ICON[def.id] +
+      '<div class="body">' +
+        '<span>' + t[def.id] + '</span>' +
+        '<span class="status">' + (acked ? t.ack : t.open.replace('{t}', clock(r.createdAt))) + '</span>' +
+        (def.id === 'water' ? '<span class="note">' + t.waterNote + '</span>' : '') +
+        '<button type="button" class="cancel" data-cancel="' + r.id + '">' + t.cancel + '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  var openHtml = open.map(function(def){
+    var lastOdd = small.length % 2 === 1 && def === small[small.length - 1];
+    var shape = def.id === 'blanket' ? ' opt--hero' : (lastOdd ? ' opt--wide' : '');
+    return '<button type="button" class="opt' + shape + '" data-ask="' + def.id + '">' + ICON[def.id] + '<span>' + t[def.id] + '</span></button>';
+  }).join('');
+
+  elPatient.innerHTML = head +
+    '<p class="room">' + t.kind[spot.kind] + ' ' + spot.num + '</p>' +
+    '<h1>' + t.q + '</h1>' +
+    '<p class="emergency"><strong>' + t.emLead + '</strong> ' + (spot.kind === 'bed' ? t.em : t.emNoBell) + '</p>' +
+    (any ? '<div class="seen"><h2>' + t.seen + '</h2><p>' + t.first + '</p></div><div class="asked-list">' + askedHtml + '</div>' : '') +
+    (open.length ? '<div class="options">' + openHtml + '</div>' : '') +
+    '<p class="fine">' + t.fine + '</p>';
+
+  if (focusType) {
+    var el = elPatient.querySelector('[data-card="' + focusType + '"]') || elPatient.querySelector('[data-ask="' + focusType + '"]');
+    if (el) el.focus();
+  }
+}
+
+elPatient.addEventListener('click', function(e){
+  var b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.lang) {
+    lang = b.dataset.lang;
+    try { localStorage.setItem('qromfort.lang', lang); } catch (err) {}
+    renderPatient();
+    var again = elPatient.querySelector('[data-lang="' + lang + '"]');
+    if (again) again.focus();
+  } else if (b.dataset.ask) {
+    var type = b.dataset.ask;
+    store.add(room, type);
+    renderPatient(type);
+    elLive.textContent = T[lang].sentLive + ' ' + T[lang][type];
+  } else if (b.dataset.cancel) {
+    var card = b.closest('[data-card]');
+    var typeBack = card ? card.dataset.card : null;
+    store.close(b.dataset.cancel);
+    renderPatient(typeBack);
+  }
+});
+
+/* =====================================================================
+   STAFF BOARD
+   ===================================================================== */
+var LEVELS = ['ack','new','wait','over'];        // index = urgency rank
+function rankOf(r, now){
+  if (r.ackAt) return 0;
+  var age = now - r.createdAt;
+  var byAge = age >= OVER_AFTER ? 3 : (age >= WAIT_AFTER ? 2 : 1);
+  return Math.max(byAge, REQ[r.type].floor + 1);
+}
+var STATE_WORD = { ack:'on the way', 'new':'new', wait:'waiting', over:'over 10 minutes' };
+var GLYPH = { ack:'✓ ', 'new':'', wait:'', over:'! ' };
+
+var tiles = {};
+var openRoom = null;
+
+function buildBoard(){
+  var wrap = $('areas');
+  AREAS.forEach(function(area){
+    var h = document.createElement('h2');
+    h.className = 'area';
+    h.textContent = area.title;
+    var grid = document.createElement('div');
+    grid.className = 'grid';
+    area.spots.forEach(function(sp){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tile';
+      b.disabled = true;
+      b.dataset.room = sp.id;
+      b.innerHTML = '<span class="n">' + sp.id + '</span><span class="what"></span><span class="t"></span>';
+      grid.appendChild(b);
+      tiles[sp.id] = { el:b, what:b.querySelector('.what'), t:b.querySelector('.t') };
+    });
+    wrap.appendChild(h);
+    wrap.appendChild(grid);
+  });
+  wrap.addEventListener('click', function(e){
+    var b = e.target.closest('.tile');
+    if (b && !b.disabled) openSheet(b.dataset.room);
+  });
+}
+
+function summarize(now){
+  var byRoom = {};
+  store.list().forEach(function(r){ (byRoom[r.room] = byRoom[r.room] || []).push(r); });
+  var out = {};
+  Object.keys(byRoom).forEach(function(rm){
+    var list = byRoom[rm].slice().sort(function(a,b){
+      return (rankOf(b, now) - rankOf(a, now)) || (a.createdAt - b.createdAt);
+    });
+    out[rm] = { list:list, top:list[0], level:LEVELS[rankOf(list[0], now)] };
+  });
+  return out;
+}
+
+function tickBoard(){
+  var now = Date.now();
+  var rooms = summarize(now);
+  var waiting = 0, onWay = 0, longest = null;
+
+  ROOMS.forEach(function(rm){
+    var tile = tiles[rm], info = rooms[rm];
+    if (!info) {
+      if (!tile.el.disabled) {
+        tile.el.disabled = true;
+        tile.el.removeAttribute('data-level');
+        tile.el.removeAttribute('aria-expanded');
+        tile.what.textContent = '';
+        tile.t.textContent = '';
+      }
+      tile.el.setAttribute('aria-label', SPOT[rm].staff + ', no requests');
+      return;
+    }
+    info.list.forEach(function(r){
+      if (r.ackAt) onWay++;
+      else {
+        waiting++;
+        if (!longest || r.createdAt < longest.createdAt) longest = r;
+      }
+    });
+    var more = info.list.length - 1;
+    tile.el.disabled = false;
+    tile.el.dataset.level = info.level;
+    tile.el.setAttribute('aria-expanded', String(openRoom === rm));
+    tile.what.textContent = (REQ[info.top.type].short || REQ[info.top.type].staff) + (more ? ' +' + more : '');
+    tile.t.textContent = GLYPH[info.level] + elapsed(now - info.top.createdAt);
+    tile.el.setAttribute('aria-label', SPOT[rm].staff + ', ' + REQ[info.top.type].staff + ', ' + STATE_WORD[info.level] + (more ? ', plus ' + more + ' more' : ''));
+  });
+
+  var sum = $('b-sum');
+  if (!waiting && !onWay) sum.textContent = 'All rooms quiet.';
+  else {
+    var parts = [];
+    if (waiting) parts.push(waiting + ' waiting');
+    if (onWay) parts.push(onWay + ' on the way');
+    sum.textContent = parts.join(', ') + (longest ? '. Longest wait: ' + SPOT[longest.room].staff + ', ' + elapsed(now - longest.createdAt) : '.');
+  }
+
+  if (openRoom) {
+    var info2 = rooms[openRoom];
+    if (!info2) { closeSheet(true); }
+    else {
+      $('sheet').style.setProperty('--c', 'var(--m-' + info2.level + ')');
+      $('sheet-rows').querySelectorAll('[data-at]').forEach(function(s){
+        s.textContent = elapsed(now - Number(s.dataset.at));
+      });
+    }
+  }
+}
+
+function renderSheet(){
+  if (!openRoom) return;
+  var now = Date.now();
+  var info = summarize(now)[openRoom];
+  if (!info) { closeSheet(true); return; }
+  $('sheet-title').textContent = SPOT[openRoom].staff;
+  $('sheet-rows').innerHTML = info.list.map(function(r){
+    var acked = !!r.ackAt;
+    return '<div class="row">' +
+      '<div class="row-what"><strong>' + REQ[r.type].staff + '</strong>' +
+        '<span>' + (acked ? 'On the way. Asked ' : 'Waiting ') + '<span data-at="' + r.createdAt + '">' + elapsed(now - r.createdAt) + '</span>' + (acked ? ' ago' : '') + '</span></div>' +
+      '<div class="row-acts">' +
+        (acked ? '' : '<button type="button" class="go" data-act="ack" data-id="' + r.id + '">On my way</button>') +
+        '<button type="button" data-act="done" data-id="' + r.id + '">Done</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function openSheet(rm){
+  openRoom = rm;
+  $('sheet').hidden = false;
+  renderSheet();
+  tickBoard();
+  $('sheet-title').focus();
+}
+function closeSheet(silent){
+  var was = openRoom;
+  openRoom = null;
+  $('sheet').hidden = true;
+  if (was && tiles[was]) {
+    tiles[was].el.removeAttribute('aria-expanded');
+    if (!silent && !tiles[was].el.disabled) tiles[was].el.focus();
+  }
+}
+$('sheet-close').addEventListener('click', function(){ closeSheet(false); });
+$('sheet-rows').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-act]');
+  if (!b) return;
+  if (b.dataset.act === 'ack') store.ack(b.dataset.id);
+  else store.close(b.dataset.id);
+  if (openRoom) $('sheet-title').focus();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && openRoom) closeSheet(false);
+});
+
+/* =====================================================================
+   VIEW SWITCHING + PROTOTYPE CONTROLS
+   ===================================================================== */
+function showView(next){
+  view = next;
+  var isBoard = view === 'board';
+  document.body.classList.toggle('is-board', isBoard);
+  elPatient.hidden = isBoard;
+  elBoard.hidden = !isBoard;
+  $('seg-patient').setAttribute('aria-pressed', String(!isBoard));
+  $('seg-board').setAttribute('aria-pressed', String(isBoard));
+  $('room-pick').hidden = isBoard;
+  $('seed').hidden = !isBoard;
+  $('clear').hidden = !isBoard;
+  if (isBoard) { document.documentElement.lang = 'en'; tickBoard(); }
+  else { closeSheet(true); renderPatient(); }
+}
+
+function seedSamples(){
+  var now = Date.now(), m = 60 * 1000;
+  store.add('3',  'pillow',   now - 40 * 1000);
+  store.add('7',  'blanket',  now - (6 * m + 12 * 1000));
+  store.add('15', 'bathroom', now - 1 * m);
+  store.add('18', 'water',    now - 11 * m);
+  store.add('18', 'blanket',  now - 3 * m);
+  store.add('21', 'blanket',  now - 4 * m, now - 2 * m);
+  store.add('42B','charger',  now - 2 * m);
+  store.add('C2', 'blanket',  now - 7 * m);
+}
+
+if (demo) {
+  $('demo').hidden = false;
+  var sel = $('room-select');
+  ROOMS.forEach(function(rm){
+    var o = document.createElement('option');
+    o.value = rm; o.textContent = SPOT[rm].staff;
+    if (rm === room) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', function(){ room = sel.value; renderPatient(); });
+  $('seg-patient').addEventListener('click', function(){ showView('patient'); });
+  $('seg-board').addEventListener('click', function(){ showView('board'); });
+  $('seed').addEventListener('click', seedSamples);
+  $('clear').addEventListener('click', function(){ store.clear(); });
+}
+
+var ackSeen = {};
+store.list().forEach(function(r){ if (r.ackAt) ackSeen[r.id] = true; });
+store.subscribe(function(){
+  if (view === 'board') { renderSheet(); tickBoard(); }
+  else {
+    // announce "on the way" once when the team picks up this room's request
+    var newlyAcked = store.list().some(function(r){
+      if (r.room === room && r.ackAt && !ackSeen[r.id]) { ackSeen[r.id] = true; return true; }
+      return false;
+    });
+    renderPatient();
+    if (newlyAcked) elLive.textContent = T[lang].ackLive;
+  }
+});
+
+buildBoard();
+showView(view);
+setInterval(function(){ if (view === 'board') tickBoard(); }, 1000);
+
+})();
+</script>
+</body>
+</html>
