@@ -91,7 +91,20 @@ button{cursor:pointer}
 @media (hover:hover){.lang button[aria-pressed="false"]:hover{background:var(--press)}}
 @media (max-width:24rem){.lang button{padding:.3rem .2rem;font-size:.8125rem}}
 @media (max-width:21rem){.lang{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
-.where{margin:0 0 .1rem;color:var(--ink-soft);font-size:.8125rem;line-height:1.25}
+.where{display:flex;align-items:baseline;gap:.5rem;margin:0 0 .1rem;color:var(--ink-soft);font-size:.8125rem;line-height:1.25}
+.where .change{background:none;border:0;padding:.15rem .25rem;margin:-.15rem 0;color:var(--tide);font-size:.8125rem;text-decoration:underline;text-underline-offset:.2em}
+.roomform{display:flex;gap:.5rem;margin:0}
+.roomform input{flex:1;min-width:0;height:3.5rem;padding:0 1rem;border:1.5px solid var(--ink-soft);border-radius:.875rem;background:transparent;color:var(--ink);font-size:1.5rem;font-weight:700}
+.roomform input[aria-invalid="true"]{border-color:var(--rose)}
+.roomform .go{flex:none;min-height:3.5rem;padding:0 1.25rem;border:0;border-radius:.875rem;background:var(--tide);color:var(--on-tide);font-size:1rem;font-weight:700}
+.pick{display:flex;flex-wrap:wrap;gap:.5rem}
+.chip{min-height:46px;padding:0 1.1rem;border:1.5px solid var(--line);border-radius:999px;background:none;color:var(--ink);font-size:1rem}
+@media (hover:hover){.chip:hover{background:var(--press)}}
+.elsewhere{color:var(--ink-soft);font-size:.9375rem}
+.elsewhere summary{display:flex;align-items:center;min-height:44px;cursor:pointer;list-style:none;text-decoration:underline;text-underline-offset:.3em}
+.elsewhere summary::-webkit-details-marker{display:none}
+.elsewhere[open] .pick{margin-bottom:.25rem}
+.hint{margin:0;color:var(--ink-soft);font-size:.9375rem}
 .patient h1{font-family:var(--serif);font-weight:400;font-size:clamp(1.5rem,6.4vw,1.875rem);line-height:1.12;margin:0 0 .5rem;text-wrap:balance}
 .emergency{margin:0;color:var(--ink-soft);font-size:.8125rem;line-height:1.35}
 .emergency strong{color:var(--ink)}
@@ -325,10 +338,36 @@ REQUESTS.forEach(function(r){ REQ[r.id] = r; });
 var params = new URLSearchParams(location.search);
 var qRoom = params.get('room');
 var qView = params.get('view');
-var onSite = /(^|\.)qromfort\.com$/i.test(location.hostname);
+var onSite = /(^|\.)qromfort\.com$|^(localhost|127\.0\.0\.1)$/i.test(location.hostname);
 var demo = params.has('demo') || (!qRoom && qView !== 'board' && !onSite);
 var view = qView === 'board' ? 'board' : 'patient';
-var room = ROOMS.indexOf(qRoom) > -1 ? qRoom : (demo ? '12' : null);
+
+// A scan (or a link from yourERteam) puts the room in the address. The phone remembers it, so
+// opening the bare address later lands in the same room. Otherwise the patient types it in.
+var ROOM_KEY = 'qromfort.room';
+var ROOM_TTL = 6 * 60 * 60 * 1000;          // a remembered room is forgotten after 6 hours
+function cleanRoom(v){ return String(v == null ? '' : v).toUpperCase().replace(/^ROOM/, '').replace(/[^0-9A-Z]/g, '').replace(/^0+(?=\d)/, ''); }
+function matchRoom(v){ var c = cleanRoom(v); return SPOT[c] ? c : null; }
+function isSplit(v){ var c = cleanRoom(v); return (c === '42' || c === '43') ? c : null; }
+function savedRoom(){
+  try {
+    var o = JSON.parse(localStorage.getItem(ROOM_KEY));
+    if (o && SPOT[o.id] && Date.now() - o.at < ROOM_TTL) return o.id;
+  } catch (e) {}
+  return null;
+}
+function saveRoom(id){ try { localStorage.setItem(ROOM_KEY, JSON.stringify({ id:id, at:Date.now() })); } catch (e) {} }
+function forgetRoom(){ try { localStorage.removeItem(ROOM_KEY); } catch (e) {} }
+
+var entryBase = null, entryError = false;
+var room = null;
+if (demo) room = '12';
+else if (view === 'patient') {
+  room = matchRoom(qRoom);
+  if (room) saveRoom(room);
+  else if (isSplit(qRoom)) entryBase = isSplit(qRoom);
+  else if (!qRoom) room = savedRoom();
+}
 
 function readJSON(key, fallback){
   try { var v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? v : fallback; }
@@ -370,6 +409,7 @@ function localStore(){
     now: function(){ return Date.now(); },
     list: function(){ return mem.slice(); },
     start: function(){ return Promise.resolve(); },
+    stop: function(){},
     canCancel: function(){ return true; },
     seed: put,
     add: function(room, type){ return Promise.resolve(put(room, type)); },
@@ -423,7 +463,7 @@ function remoteStore(){
     if (!scope) return Promise.resolve();
     var q = scope.room ? '?room=' + encodeURIComponent(scope.room) : '';
     return call('GET', q).then(function(res){
-      if (settle(res) && scope.room) {
+      if (settle(res) && scope && scope.room) {
         // forget cancel tokens for requests that are gone
         var live = {}, changed = false;
         mem.forEach(function(r){ live[r.id] = true; });
@@ -456,6 +496,7 @@ function remoteStore(){
     if (isBoard() && !session) { api.state = 'locked'; notify(); return Promise.resolve(); }
     return refresh();
   };
+  api.stop = function(){ clearTimeout(timer); scope = null; mem = []; };
   api.add = function(room, type){
     return call('POST', '', { room:room, type:type }).then(function(res){
       if (res.status !== 200 || !res.data.request) throw new Error(res.data.error || 'not_sent');
@@ -519,7 +560,7 @@ var T = {
     waterNote:'Your nurse will check that it’s safe for you to drink first.',
     otherNote:'Someone will stop by. Tell us what you need and we’ll take care of it.',
     fine:'No login. No personal information.',
-    scan:'Scan the code next to you to start.', sentLive:'Request sent.', ackLive:'Someone is on the way.',
+    scan:'Or scan the code next to you.', ask:'What’s your room number?', go:'Continue', ab:'Which one?', badRoom:'We couldn’t find that room. Check the number by your door, or ask a staff member.', elsewhere:'Waiting room or triage?', change:'Change', sentLive:'Request sent.', ackLive:'Someone is on the way.',
     team:'Meet the team', qrudos:'Give Qrudos',
     sending:'Sending…', fail:'That didn’t send. Try again, or tell a staff member.'
   },
@@ -535,7 +576,7 @@ var T = {
     waterNote:'Su enfermera o enfermero confirmará primero que puede beber.',
     otherNote:'Alguien pasará a verle. Díganos qué necesita y nos encargaremos.',
     fine:'Sin inicio de sesión. Sin datos personales.',
-    scan:'Escanee el código que tiene al lado para empezar.', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.',
+    scan:'O escanee el código que tiene al lado.', ask:'¿Cuál es el número de su habitación?', go:'Continuar', ab:'¿Cuál?', badRoom:'No encontramos esa habitación. Revise el número junto a su puerta o pregunte al personal.', elsewhere:'¿Sala de espera o triaje?', change:'Cambiar', sentLive:'Pedido enviado.', ackLive:'Alguien viene en camino.',
     team:'Conozca al equipo', qrudos:'Dar un Qrudos',
     sending:'Enviando…', fail:'No se pudo enviar. Inténtelo de nuevo o avise a un miembro del personal.'
   },
@@ -551,7 +592,7 @@ var T = {
     waterNote:'Enfimyè ou a ap verifye anvan si ou ka bwè.',
     otherNote:'Yon moun ap pase wè ou. Di nou sa ou bezwen epi n ap okipe sa.',
     fine:'Pa gen kont. Pa gen enfòmasyon pèsonèl.',
-    scan:'Eskane kòd ki bò kote w la pou kòmanse.', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.',
+    scan:'Oswa eskane kòd ki bò kote w la.', ask:'Ki nimewo chanm ou an?', go:'Kontinye', ab:'Ki youn?', badRoom:'Nou pa jwenn chanm sa a. Verifye nimewo ki bò pòt ou a, oswa mande yon anplwaye.', elsewhere:'Sal datant oswa triyaj?', change:'Chanje', sentLive:'Demann lan voye.', ackLive:'Yon moun ap vini.',
     team:'Rankontre ekip la', qrudos:'Bay yon Qrudos',
     sending:'N ap voye…', fail:'Sa pa voye. Eseye ankò, oswa di yon anplwaye sa.'
   },
@@ -567,7 +608,7 @@ var T = {
     waterNote:'A enfermagem vai confirmar antes se você pode beber.',
     otherNote:'Alguém vai passar aí. Diga o que precisa e vamos cuidar disso.',
     fine:'Sem login. Sem dados pessoais.',
-    scan:'Escaneie o código ao seu lado para começar.', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.',
+    scan:'Ou escaneie o código ao seu lado.', ask:'Qual é o número do seu quarto?', go:'Continuar', ab:'Qual?', badRoom:'Não encontramos esse quarto. Confira o número ao lado da porta ou pergunte à equipe.', elsewhere:'Sala de espera ou triagem?', change:'Mudar', sentLive:'Pedido enviado.', ackLive:'Alguém está a caminho.',
     team:'Conheça a equipe', qrudos:'Dar um Qrudos',
     sending:'Enviando…', fail:'Não foi enviado. Tente de novo ou avise alguém da equipe.'
   }
@@ -645,8 +686,29 @@ elPatient.addEventListener('error', function(e){
   img.replaceWith(label);
 }, true);
 
+function entryHtml(t, typed){
+  var chip = function(id, label){ return '<button type="button" class="chip" data-pick="' + id + '">' + label + '</button>'; };
+  var body;
+  if (entryBase) {
+    body = '<p class="hint">' + entryBase + ': ' + t.ab + '</p><div class="pick">' + chip(entryBase + 'A', entryBase + 'A') + chip(entryBase + 'B', entryBase + 'B') + '</div>';
+  } else {
+    var places = '';
+    AREAS.forEach(function(a){ if (a.kind !== 'bed') a.spots.forEach(function(sp){ places += chip(sp.id, t.kind[a.kind] + ' ' + sp.num); }); });
+    body =
+      '<form class="roomform" id="roomform" novalidate>' +
+        '<input id="roomnum" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="go" maxlength="3" autocomplete="off" aria-labelledby="askh"' + (entryError ? ' aria-invalid="true"' : '') + ' value="' + typed + '">' +
+        '<button type="submit" class="go">' + t.go + '</button>' +
+      '</form>' +
+      (entryError ? '<p class="fail" role="alert">' + t.badRoom + '</p>' : '') +
+      '<details class="elsewhere"><summary>' + t.elsewhere + '</summary><div class="pick">' + places + '</div></details>';
+  }
+  return '<h1 id="askh">' + t.ask + '</h1>' + body + '<p class="hint">' + t.scan + '</p>';
+}
+
 function renderPatient(focusType){
   var t = T[lang];
+  var typedEl = document.getElementById('roomnum');
+  var typed = typedEl ? typedEl.value.replace(/\D/g, '') : '';
   document.documentElement.lang = lang;
 
   var langs =
@@ -666,7 +728,7 @@ function renderPatient(focusType){
 
   var html;
   if (!room) {
-    html = langs + '<div class="landing"><h1>' + t.scan + '</h1>' + moreLinks(t) + '</div>' + foot('');
+    html = langs + '<div class="landing">' + entryHtml(t, typed) + moreLinks(t) + '</div>' + foot('');
   } else {
     var spot = SPOT[room];
     var mine = {};
@@ -696,7 +758,7 @@ function renderPatient(focusType){
     }).join('');
 
     html = langs +
-      '<p class="where">' + t.kind[spot.kind] + ' ' + spot.num + '</p>' +
+      '<p class="where"><span>' + t.kind[spot.kind] + ' ' + spot.num + '</span>' + (demo ? '' : '<button type="button" class="change" data-change="1">' + t.change + '</button>') + '</p>' +
       '<h1>' + t.q + '</h1>' +
       '<p class="emergency"><strong>' + t.emLead + '</strong> ' + (spot.kind === 'bed' ? t.em : t.emNoBell) + '</p>' +
       (sendFailed ? '<p class="fail" role="alert">' + t.fail + '</p>' : '') +
@@ -745,6 +807,59 @@ elPatient.addEventListener('click', function(e){
     var card = b.closest('[data-card]');
     var typeBack = card ? card.dataset.card : null;
     store.close(b.dataset.cancel).then(function(){ renderPatient(typeBack); });
+  } else if (b.dataset.pick) {
+    chooseRoom(b.dataset.pick);
+  } else if (b.dataset.change) {
+    changeRoom();
+  }
+});
+
+function chooseRoom(id){
+  room = id; entryBase = null; entryError = false;
+  saveRoom(id);
+  try { history.replaceState(null, '', '?room=' + encodeURIComponent(id)); } catch (e) {}
+  if (!demo) store.start({ room:id });
+  renderPatient('force');
+  elLive.textContent = T[lang].kind[SPOT[id].kind] + ' ' + SPOT[id].num;
+}
+function changeRoom(){
+  if (store.stop) store.stop();
+  forgetRoom();
+  room = null; entryBase = null; entryError = false;
+  pending = {}; sendFailed = false;
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+  renderPatient('force');
+  var f = document.getElementById('roomnum');
+  if (f) f.focus();
+}
+elPatient.addEventListener('submit', function(e){
+  if (!e.target.matches || !e.target.matches('#roomform')) return;
+  e.preventDefault();
+  var raw = document.getElementById('roomnum').value;
+  var id = matchRoom(raw);
+  if (id) { chooseRoom(id); return; }
+  var base = isSplit(raw);
+  if (base) {
+    entryBase = base; entryError = false;
+    renderPatient('force');
+    var first = elPatient.querySelector('[data-pick]');
+    if (first) first.focus();
+    return;
+  }
+  entryError = true;
+  renderPatient('force');
+  var f = document.getElementById('roomnum');
+  if (f) f.focus();
+});
+elPatient.addEventListener('input', function(e){
+  if (e.target.id !== 'roomnum') return;
+  var clean = e.target.value.replace(/\D/g, '');
+  if (clean !== e.target.value) e.target.value = clean;
+  if (entryError) {
+    entryError = false;
+    e.target.removeAttribute('aria-invalid');
+    var msg = elPatient.querySelector('.fail');
+    if (msg) msg.remove();
   }
 });
 
